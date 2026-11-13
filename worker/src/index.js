@@ -68,7 +68,7 @@ async function fetchProvider(provider) {
       },
       signal: AbortSignal.timeout(15000),
     });
-    if (!response.ok) throw new Error(HTTP ${response.status});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
     return { name: provider.name, url: provider.url, rates: provider.parse(html) };
   } catch (error) {
