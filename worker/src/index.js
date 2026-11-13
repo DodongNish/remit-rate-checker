@@ -41,7 +41,7 @@ const PROVIDERS = [
         throw new Error("PHP rate not found in API response");
       }
       return [{ method: "App", rate }];
-    },,
+    },
   },
 ];
 
