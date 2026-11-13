@@ -65,17 +65,21 @@ def fetch_sbi():
     if rows:
         return rows
 
-    # 診断: どんなページが返ってきたかをログに出す
-    text = squash(soup.get_text(" "))
-    title = soup.title.string if soup.title else None
-    print(f"[DEBUG] SBI: title={title!r} text_len={len(text)} "
-          f"tables={len(soup.find_all('table'))} "
-          f"has_Philippines={'Philippines' in text}", file=sys.stderr)
-    print(f"[DEBUG] SBI: forms={[f.get('id') for f in soup.find_all('form')]} "
-          f"selects={[x.get('name') for x in soup.find_all('select')]} "
-          f"viewstate={bool(soup.find('input', {'name': 'javax.faces.ViewState'}))}",
+    # 診断: 表を埋める AJAX の送り方を調べる
+    form = soup.find("form")
+    print(f"[DEBUG] SBI: form attrs={form.attrs if form else None}", file=sys.stderr)
+    print(f"[DEBUG] SBI: inputs={[(i.get('name'), (i.get('value') or '')[:30]) for i in soup.find_all('input')]}",
           file=sys.stderr)
-    print(f"[DEBUG] SBI: head={text[:600]!r}", file=sys.stderr)
+    print(f"[DEBUG] SBI: buttons={[(b.get('id'), b.get('onclick')) for b in soup.find_all(['button','a']) if b.get('id')]}",
+          file=sys.stderr)
+    t = soup.find("table")
+    print(f"[DEBUG] SBI: table={str(t)[:700]!r}", file=sys.stderr)
+    print(f"[DEBUG] SBI: script_src={[x.get('src') for x in soup.find_all('script') if x.get('src')]}",
+          file=sys.stderr)
+    for i, sc in enumerate(soup.find_all("script")):
+        body = sc.get_text()
+        if any(k in body for k in ("ab(", "ajax", "jsf", "remoteCommand", "poll", "Poll")):
+            print(f"[DEBUG] SBI: script{i}={squash(body)[:1200]!r}", file=sys.stderr)
     raise ValueError("Philippines の行が見つからない")
 
 
