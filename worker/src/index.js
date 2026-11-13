@@ -164,9 +164,9 @@ async function inspectSBI() {
   const initial = await fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(15000) });
   const initialHtml = await initial.text();
   const setCookie = initial.headers.get("set-cookie") || "";
-  const cookie = [...setCookie.matchAll(/(?:^|,\\s*)([^=;,\\s]+)=([^;,\\s]+)/g)].map((m) => m[1] + "=" + m[2]).join("; ");
-  const token = initialHtml.match(/name="uniqueToken"\\s+value="([^"]+)"/i)?.[1];
-  const viewState = initialHtml.match(/name="javax\\.faces\\.ViewState"\\s+id="[^"]+"\\s+value="([^"]+)"/i)?.[1];
+  const cookie = [...setCookie.matchAll(/(?:^|,\s*)([^=;,\s]+)=([^;,\s]+)/g)].map((m) => m[1] + "=" + m[2]).join("; ");
+  const token = initialHtml.match(/name="uniqueToken"\s+value="([^"]+)"/i)?.[1];
+  const viewState = initialHtml.match(/name="javax\.faces\.ViewState"\s+id="[^"]+"\s+value="([^"]+)"/i)?.[1];
   const formData = new URLSearchParams();
   formData.set("dummyForm", "dummyForm");
   if (token) formData.set("uniqueToken", token);
@@ -195,9 +195,9 @@ async function inspectSBI() {
       exchangePage = {
         requestedUrl: target.toString(), status: page.status, location: page.headers.get("location"),
         setCookie: page.headers.get("set-cookie"), htmlLength: html.length,
-        title: html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1] ?? null,
-        tables: [...html.matchAll(/<table\\b[^>]*>([\\s\\S]*?)<\\/table>/gi)].map((m) => plainText(m[1]).slice(0, 8000)),
-        rows: [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map((m) => [...m[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map((c) => plainText(c[1]))).filter((cells) => cells.length),
+        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
+        tables: [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)].map((m) => plainText(m[1]).slice(0, 8000)),
+        rows: [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((m) => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => plainText(c[1]))).filter((cells) => cells.length),
         textPreview: plainText(html).slice(0, 12000), bodyStart: html.slice(0, 18000),
       };
     }
