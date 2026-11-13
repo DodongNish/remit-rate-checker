@@ -23,6 +23,65 @@ const PROVIDERS = [
     },
   },
   {
+    name: "SBI Remit",
+    url: "https://www.remit.co.jp/en/kaigaisoukin/exchangeratecommission/exchange/",
+    async fetchRates() {
+      const endpoint = "https://ires.remit.co.jp/IRESWeb/ExchangeDirect.jsf";
+      const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+      };
+      const initial = await fetch(endpoint, { headers, redirect: "manual", signal: AbortSignal.timeout(15000) });
+      if (!initial.ok) throw new Error(\`Initial page HTTP \${initial.status}\`);
+      const initialHtml = await initial.text();
+      const setCookie = initial.headers.get("set-cookie") || "";
+      const cookie = [...setCookie.matchAll(/(?:^|,\s*)([^=;,\s]+)=([^;,\s]+)/g)]
+        .map((match) => match[1] + "=" + match[2]).join("; ");
+      const token = initialHtml.match(/name="uniqueToken"\s+value="([^"]+)"/i)?.[1];
+      const viewState = initialHtml.match(/name="javax\.faces\.ViewState"\s+id="[^"]+"\s+value="([^"]+)"/i)?.[1];
+      if (!cookie || !token || !viewState) throw new Error("SBI session initialization data not found");
+
+      const form = new URLSearchParams();
+      form.set("dummyForm", "dummyForm");
+      form.set("uniqueToken", token);
+      form.set("mulClickToken", "");
+      form.set("dummyForm:doInit", "");
+      form.set("javax.faces.ViewState", viewState);
+      const posted = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          ...headers, "Content-Type": "application/x-www-form-urlencoded",
+          "Cookie": cookie, "Origin": "https://ires.remit.co.jp", "Referer": endpoint,
+        },
+        body: form.toString(), redirect: "manual", signal: AbortSignal.timeout(20000),
+      });
+      if (posted.status < 300 || posted.status >= 400) throw new Error(\`SBI initialization HTTP \${posted.status}\`);
+      const location = posted.headers.get("location");
+      if (!location) throw new Error("SBI exchange-rate redirect not found");
+      const target = new URL(location, endpoint);
+      target.protocol = "https:";
+      const page = await fetch(target.toString(), {
+        headers: { ...headers, "Cookie": cookie, "Referer": endpoint },
+        redirect: "manual", signal: AbortSignal.timeout(20000),
+      });
+      if (!page.ok) throw new Error(\`SBI exchange-rate page HTTP \${page.status}\`);
+      const html = await page.text();
+      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+        .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+          .map((cell) => plainText(cell[1])));
+      const rates = rows
+        .filter((cells) => cells.length >= 4 && cells[0] === "Philippines")
+        .map((cells) => {
+          const rate = cells[2].match(/([0-9]+(?:\.[0-9]+)?)\s*PHP/i);
+          return rate ? { method: cells[3].replace(/\s+/g, " ").trim(), rate: Number(rate[1]) } : null;
+        })
+        .filter((item) => item && Number.isFinite(item.rate) && item.rate > 0);
+      if (!rates.length) throw new Error("SBI PHP rates not found");
+      return rates;
+    },
+  },
+  {
     name: "City Express",
     url: "https://www.cityremit.com/en/exchange-rates/#:~:text=PHILIPPINES",
     async fetchRates() {
