@@ -58,6 +58,36 @@ function plainText(value) {
     .trim();
 }
 
+
+async function inspectCityExpress() {
+  const provider = PROVIDERS.find((item) => item.name === "City Express");
+  const response = await fetch(provider.url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en,ja;q=0.8",
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+  const html = await response.text();
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+    .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map((cell) => plainText(cell[1])))
+    .filter((cells) => cells.some((cell) => /Philippines|0\.395|0\.397/i.test(cell)));
+  const text = plainText(html);
+  return {
+    fetchedUrl: response.url,
+    httpStatus: response.status,
+    htmlLength: html.length,
+    matchingRows: rows,
+    textAroundRates: ["0.395", "0.397"].map((term) => {
+      const index = text.indexOf(term);
+      return { term, context: index >= 0 ? text.slice(Math.max(0, index - 100), index + 150) : null };
+    }),
+  };
+}
+
 async function fetchProvider(provider) {
   try {
     const response = await fetch(provider.url, {
@@ -91,6 +121,18 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
+    }
+    if (url.pathname === "/api/debug/city-express" && request.method === "GET") {
+      try {
+        return Response.json(await inspectCityExpress(), {
+          headers: { ...corsHeaders, "Cache-Control": "no-store, max-age=0" },
+        });
+      } catch (error) {
+        return Response.json(
+          { error: error instanceof Error ? error.message : String(error) },
+          { status: 502, headers: corsHeaders },
+        );
+      }
     }
     if (url.pathname !== "/api/rates") {
       return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
