@@ -173,14 +173,14 @@ async function inspectSBI() {
         signal: AbortSignal.timeout(15000),
       });
       const html = await response.text();
-      const links = [...html.matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)]
+      const links = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)]
         .map((m) => ({ attrs: m[1].slice(0, 500), text: plainText(m[2]).slice(0, 180) }))
         .filter((x) => /exchange|rate|ires|philipp|php/i.test(x.attrs + " " + x.text))
         .slice(0, 40);
-      const forms = [...html.matchAll(/<form\\b([^>]*)>([\\s\\S]*?)<\\/form>/gi)]
+      const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)]
         .map((m) => ({
           attrs: m[1].slice(0, 1000),
-          fields: [...m[2].matchAll(/<(input|select|button|textarea)\\b([^>]*)>/gi)]
+          fields: [...m[2].matchAll(/<(input|select|button|textarea)\b([^>]*)>/gi)]
             .map((f) => f[1] + " " + f[2].slice(0, 500)).slice(0, 80),
         }));
       results.push({
@@ -190,7 +190,7 @@ async function inspectSBI() {
         contentType: response.headers.get("content-type"),
         setCookie: response.headers.get("set-cookie"),
         htmlLength: html.length,
-        title: html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1] ?? null,
+        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
         links,
         forms,
         bodyStart: html.slice(0, 14000),
@@ -201,7 +201,9 @@ async function inspectSBI() {
   }
   return { results };
 }
-\nasync function fetchProvider(provider) {
+
+
+async function fetchProvider(provider) {
   try {
     if (provider.fetchRates) {
       return { name: provider.name, url: provider.url, rates: await provider.fetchRates() };
