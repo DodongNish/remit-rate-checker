@@ -2,6 +2,9 @@ const PROVIDERS = [
   {
     name: "Smiles",
     url: "https://www.smileswallet.com/japan/exchange-rates/#:~:text=Philippines",
+    getUpdatedAt(html) {
+      return html.match(/(\d{4}\s+[A-Za-z]+\s+\d{1,2},?\s+\w+\s+\d{1,2}:\d{2})/)?.[1] ?? null;
+    },
     parse(html) {
       const anchors = [...html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)];
       for (const match of anchors) {
@@ -15,6 +18,9 @@ const PROVIDERS = [
   {
     name: "D-com",
     url: "https://sendmoney.co.jp/en/fx-rate#:~:text=Philippines",
+    getUpdatedAt(html) {
+      return html.match(/Last updated on:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/i)?.[1] ?? null;
+    },
     parse(html) {
       const text = plainText(html);
       const rate = text.match(/\(PHP\)\s*PHP\s*(\d+(?:\.\d+)?)/i);
@@ -70,7 +76,7 @@ const PROVIDERS = [
       const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
         .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1])));
-      const updatedAt = plainText(html).match(/(\\d{4}\\/\\d{2}\\/\\d{2}\\s+\\d{2}:\\d{2})\\s*現在?/)?.[1] ?? null;
+      const updatedAt = plainText(html).match(/(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\s*現在?/)?.[1] ?? null;
       const rates = rows
         .filter((cells) => cells.length >= 4 && cells[0] === "Philippines")
         .map((cells) => {
