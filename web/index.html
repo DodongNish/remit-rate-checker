@@ -285,11 +285,41 @@
     }
     function formatUpdatedAt(value) {
       if (!value) return "Not provided";
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime()) && /T/.test(value)) {
-        return date.toLocaleString("en-GB", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }) + " JST";
+
+      const text = String(value).trim();
+      let date;
+
+      // Timestamps with an explicit timezone are absolute times.
+      if (/T.*(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(text)) {
+        date = new Date(text);
+      } else {
+        // Provider timestamps without a timezone are treated as Japan time.
+        const match = text.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T,]+(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+        if (match) {
+          const [, year, month, day, hour, minute] = match;
+          date = new Date(Date.UTC(
+            Number(year), Number(month) - 1, Number(day),
+            Number(hour) - 9, Number(minute)
+          ));
+        } else {
+          date = new Date(text);
+        }
       }
-      return value + (value.endsWith("JST") ? "" : " JST");
+
+      if (Number.isNaN(date.getTime())) return "Not provided";
+
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Tokyo",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(date);
+      const get = (type) => parts.find((part) => part.type === type)?.value;
+      const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
+      const month = monthNames[Number(get("month")) - 1];
+      return `${month} ${Number(get("day"))}, ${get("hour")}:${get("minute")} JST`;
     }
 
     // Display the current time in Japan, including seconds.
