@@ -98,13 +98,17 @@ const PROVIDERS = [
       const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
       const response = await fetch(apiUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
-          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Origin": "https://www.cityremit.com",
+          "Referer": "https://www.cityremit.com/en/exchange-rates/",
         },
         signal: AbortSignal.timeout(12000),
       });
-      if (!response.ok) throw new Error(`API HTTP ${response.status}`);
-      const data = await response.json();
+      const responseBody = await response.text();
+      if (!response.ok) throw new Error(`API HTTP ${response.status}: ${responseBody.slice(0, 500)}`);
+      const data = JSON.parse(responseBody);
       const rate = Number(data?.rates?.PHP);
       if (!Number.isFinite(rate) || rate <= 0) {
         throw new Error("PHP rate not found in API response");
