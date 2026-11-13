@@ -181,6 +181,7 @@ async function inspectSBI() {
   if (viewState) formData.set("javax.faces.ViewState", viewState);
 
   let postResult = null;
+  let exchangePage = null;
   if (token && viewState && cookie) {
     const posted = await fetch(url, {
       method: "POST",
@@ -195,21 +196,41 @@ async function inspectSBI() {
       redirect: "manual",
       signal: AbortSignal.timeout(20000),
     });
-    const html = await posted.text();
+    const postHtml = await posted.text();
+    const location = posted.headers.get("location");
     postResult = {
       status: posted.status,
-      location: posted.headers.get("location"),
+      location,
       setCookie: posted.headers.get("set-cookie"),
-      htmlLength: html.length,
-      title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
-      tables: [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)]
-        .map((m) => plainText(m[1]).slice(0, 5000)),
-      rows: [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
-        .map((m) => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => plainText(c[1])))
-        .filter((cells) => cells.length),
-      textPreview: plainText(html).slice(0, 10000),
-      bodyStart: html.slice(0, 16000),
+      htmlLength: postHtml.length,
+      bodyStart: postHtml.slice(0, 1000),
     };
+
+    if (posted.status >= 300 && posted.status < 400 && location) {
+      const target = new URL(location, url);
+      target.protocol = "https:";
+      const page = await fetch(target.toString(), {
+        headers: { ...headers, "Cookie": cookie, "Referer": url },
+        redirect: "manual",
+        signal: AbortSignal.timeout(20000),
+      });
+      const html = await page.text();
+      exchangePage = {
+        requestedUrl: target.toString(),
+        status: page.status,
+        location: page.headers.get("location"),
+        setCookie: page.headers.get("set-cookie"),
+        htmlLength: html.length,
+        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
+        tables: [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)]
+          .map((m) => plainText(m[1]).slice(0, 8000)),
+        rows: [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+          .map((m) => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => plainText(c[1])))
+          .filter((cells) => cells.length),
+        textPreview: plainText(html).slice(0, 12000),
+        bodyStart: html.slice(0, 18000),
+      };
+    }
   }
 
   return {
@@ -221,9 +242,9 @@ async function inspectSBI() {
       htmlLength: initialHtml.length,
       tokenFound: Boolean(token),
       viewStateFound: Boolean(viewState),
-      bodyStart: initialHtml.slice(0, 5000),
     },
     postResult,
+    exchangePage,
   };
 }
 async function fetchProvider(provider) {
