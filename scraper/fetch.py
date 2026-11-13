@@ -14,9 +14,9 @@ UA = "Mozilla/5.0 (compatible; remit-rate-page/1.0; +https://github.com/YOUR_NAM
 TIMEOUT = 20
 
 URLS = {
-    "Smiles": "https://www.smileswallet.com/japan/exchange-rates/",
-    "D-com": "https://sendmoney.co.jp/en/fx-rate",
-    "City Express": "https://www.cityremit.com/en/exchange-rates/",
+    "Smiles": "https://www.smileswallet.com/japan/exchange-rates/#:~:text=Philippines",
+    "D-com": "https://sendmoney.co.jp/en/fx-rate#:~:text=Philippines",
+    "City Express": "https://www.cityremit.com/en/exchange-rates/#:~:text=PHILIPPINES",
 }
 
 
