@@ -2,7 +2,7 @@ name: Update rates and deploy
 
 on:
   schedule:
-    - cron: "0 * * * *"   # 毎時 (UTC)
+    - cron: "17 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
