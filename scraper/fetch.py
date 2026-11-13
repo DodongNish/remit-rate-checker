@@ -68,44 +68,53 @@ def _sbi_rows(soup):
 
 def fetch_sbi():
     url = URLS["SBI Remit"]
-    top = "https://www.remit.co.jp/"
-    host = "ires.remit.co.jp"
-    headers = {
-        "User-Agent": BROWSER_UA,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ja,en;q=0.8",
-    }
 
-    def attempt(label, prep=None, cookies=None, params=None):
+    # 1) Chrome と同じヘッダー(requests)
+    try:
         with requests.Session() as s:
-            s.headers.update(headers)
-            for k, v in (cookies or {}).items():
-                s.cookies.set(k, v, domain=host)
-            if prep:
-                prep(s)
-            r = s.get(url, params=params, timeout=TIMEOUT)
-            r.encoding = r.apparent_encoding
+            s.headers.update({
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "Sec-Ch-Ua": '"Not-A.Brand";v="99", "Google Chrome";v="157", "Chromium";v="157"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+            })
+            r = s.get(url, timeout=TIMEOUT)
+            r.encoding = "utf-8"
             rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
-            print(f"[DEBUG] SBI {label}: rows={len(rows)} len={len(r.text)} "
-                  f"cookies={dict(s.cookies)}", file=sys.stderr)
-            return rows
+            print(f"[DEBUG] SBI chrome-headers: status={r.status_code} rows={len(rows)} "
+                  f"len={len(r.text)}", file=sys.stderr)
+            if rows:
+                return rows
+    except Exception as e:
+        print(f"[DEBUG] SBI chrome-headers: {type(e).__name__}: {e}", file=sys.stderr)
 
-    variants = [
-        ("plain", {}),
-        ("top-first", {"prep": lambda s: s.get(top, timeout=TIMEOUT)}),
-        ("get-twice", {"prep": lambda s: s.get(url, timeout=TIMEOUT)}),
-        ("lang=ja", {"cookies": {"lang": "ja"}}),
-        ("lang=en", {"cookies": {"lang": "en"}}),
-        ("param-ja", {"params": {"lang": "ja"}}),
-    ]
-    for label, kw in variants:
-        try:
-            rows = attempt(label, **kw)
-        except Exception as e:
-            print(f"[DEBUG] SBI {label}: {type(e).__name__}: {e}", file=sys.stderr)
-            continue
+    # 2) Chrome の TLS / HTTP2 の特徴を再現(curl_cffi)
+    try:
+        import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "curl_cffi"], check=True)
+        from curl_cffi import requests as cr
+        r = cr.get(url, impersonate="chrome", timeout=TIMEOUT,
+                   headers={"Accept-Language": "en-US,en;q=0.9"})
+        r.encoding = "utf-8"
+        rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
+        print(f"[DEBUG] SBI curl_cffi: status={r.status_code} rows={len(rows)} "
+              f"len={len(r.text)}", file=sys.stderr)
         if rows:
             return rows
+    except Exception as e:
+        print(f"[DEBUG] SBI curl_cffi: {type(e).__name__}: {e}", file=sys.stderr)
+
     raise ValueError("Philippines の行が見つからない")
 
 
