@@ -40,6 +40,19 @@ def to_rate(text):
     return float(m.group(1))
 
 
+# def fetch_sbi():
+#     # JSESSIONID が発行されるので Session を使う
+#     with requests.Session() as s:
+#         soup = get_soup(URLS["SBI Remit"], s)
+#     rows = []
+#     for tr in soup.find_all("tr"):
+#         tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
+#         if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
+#             rows.append({"method": tds[3], "rate": to_rate(tds[2])})
+#     if not rows:
+#         raise ValueError("Philippines の行が見つからない")
+#     return rows
+
 def fetch_sbi():
     # JSESSIONID が発行されるので Session を使う
     with requests.Session() as s:
@@ -49,9 +62,21 @@ def fetch_sbi():
         tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
         if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
             rows.append({"method": tds[3], "rate": to_rate(tds[2])})
-    if not rows:
-        raise ValueError("Philippines の行が見つからない")
-    return rows
+    if rows:
+        return rows
+
+    # 診断: どんなページが返ってきたかをログに出す
+    text = squash(soup.get_text(" "))
+    title = soup.title.string if soup.title else None
+    print(f"[DEBUG] SBI: title={title!r} text_len={len(text)} "
+          f"tables={len(soup.find_all('table'))} "
+          f"has_Philippines={'Philippines' in text}", file=sys.stderr)
+    print(f"[DEBUG] SBI: forms={[f.get('id') for f in soup.find_all('form')]} "
+          f"selects={[x.get('name') for x in soup.find_all('select')]} "
+          f"viewstate={bool(soup.find('input', {'name': 'javax.faces.ViewState'}))}",
+          file=sys.stderr)
+    print(f"[DEBUG] SBI: head={text[:600]!r}", file=sys.stderr)
+    raise ValueError("Philippines の行が見つからない")
 
 
 def fetch_smiles():
