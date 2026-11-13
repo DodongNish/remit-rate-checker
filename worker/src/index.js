@@ -76,7 +76,18 @@ async function inspectCityExpress() {
       .map((cell) => plainText(cell[1])))
     .filter((cells) => cells.some((cell) => /Philippines|0\.395|0\.397/i.test(cell)));
   const text = plainText(html);
-  const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  let apiProbe;
+  try {
+    const apiResponse = await fetch(new URL("/api/public/rates", response.url), {
+      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await apiResponse.text();
+    apiProbe = { url: new URL("/api/public/rates", response.url).href, status: apiResponse.status, contentType: apiResponse.headers.get("content-type"), body: body.slice(0, 12000) };
+  } catch (error) {
+    apiProbe = { error: error instanceof Error ? error.message : String(error) };
+  }
+  const scriptTags = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
   const scripts = await Promise.all(scriptTags.map(async (match) => {
     const src = match[1].match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
     const inline = match[2];
@@ -105,6 +116,7 @@ async function inspectCityExpress() {
     htmlLength: html.length,
     matchingRows: rows,
     scripts,
+    apiProbe,
     textAroundRates: ["0.395", "0.397"].map((term) => {
       const index = text.indexOf(term);
       return { term, context: index >= 0 ? text.slice(Math.max(0, index - 100), index + 150) : null };
