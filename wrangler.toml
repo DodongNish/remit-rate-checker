@@ -2,3 +2,10 @@ name = "remit-rate-checker"
 main = "worker/src/index.js"
 compatibility_date = "2026-11-13"
 workers_dev = true
+
+[[kv_namespaces]]
+binding = "PUSH_KV"
+id = "4353d85ebc96488792ec1bbd1a3aea53"
+
+[triggers]
+crons = ["*/5 * * * *"]
