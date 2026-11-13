@@ -68,21 +68,44 @@ def _sbi_rows(soup):
 
 def fetch_sbi():
     url = URLS["SBI Remit"]
-    with requests.Session() as s:
-        s.headers.update({
-            "User-Agent": BROWSER_UA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "ja,en;q=0.8",
-        })
-        r = s.get(url, timeout=TIMEOUT)
-        r.encoding = r.apparent_encoding
-        rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
+    top = "https://www.remit.co.jp/"
+    host = "ires.remit.co.jp"
+    headers = {
+        "User-Agent": BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ja,en;q=0.8",
+    }
+
+    def attempt(label, prep=None, cookies=None, params=None):
+        with requests.Session() as s:
+            s.headers.update(headers)
+            for k, v in (cookies or {}).items():
+                s.cookies.set(k, v, domain=host)
+            if prep:
+                prep(s)
+            r = s.get(url, params=params, timeout=TIMEOUT)
+            r.encoding = r.apparent_encoding
+            rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
+            print(f"[DEBUG] SBI {label}: rows={len(rows)} len={len(r.text)} "
+                  f"cookies={dict(s.cookies)}", file=sys.stderr)
+            return rows
+
+    variants = [
+        ("plain", {}),
+        ("top-first", {"prep": lambda s: s.get(top, timeout=TIMEOUT)}),
+        ("get-twice", {"prep": lambda s: s.get(url, timeout=TIMEOUT)}),
+        ("lang=ja", {"cookies": {"lang": "ja"}}),
+        ("lang=en", {"cookies": {"lang": "en"}}),
+        ("param-ja", {"params": {"lang": "ja"}}),
+    ]
+    for label, kw in variants:
+        try:
+            rows = attempt(label, **kw)
+        except Exception as e:
+            print(f"[DEBUG] SBI {label}: {type(e).__name__}: {e}", file=sys.stderr)
+            continue
         if rows:
             return rows
-        # 診断: HTML 全文を出す(約6KB)
-        html = r.text
-        for i in range(0, len(html), 1500):
-            print(f"[HTML {i // 1500}] {html[i:i + 1500]!r}", file=sys.stderr)
     raise ValueError("Philippines の行が見つからない")
 
 
