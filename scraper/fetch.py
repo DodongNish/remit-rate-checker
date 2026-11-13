@@ -73,22 +73,16 @@ def fetch_sbi():
             "User-Agent": BROWSER_UA,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "ja,en;q=0.8",
-            "Referer": "https://www.remit.co.jp/",
         })
         r = s.get(url, timeout=TIMEOUT)
         r.encoding = r.apparent_encoding
-        soup = BeautifulSoup(r.text, "html.parser")
-        rows = _sbi_rows(soup)
-        print(f"[DEBUG] SBI browser-UA: status={r.status_code} final_url={r.url} "
-              f"len={len(r.text)} rows={len(rows)} cookies={list(s.cookies.keys())} "
-              f"server={r.headers.get('Server')}", file=sys.stderr)
-        try:
-            ip = requests.get("https://ipinfo.io/json", timeout=10).json()
-            print(f"[DEBUG] runner: country={ip.get('country')} org={ip.get('org')}", file=sys.stderr)
-        except Exception as e:
-            print(f"[DEBUG] runner ip lookup failed: {e}", file=sys.stderr)
+        rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
         if rows:
             return rows
+        # 診断: HTML 全文を出す(約6KB)
+        html = r.text
+        for i in range(0, len(html), 1500):
+            print(f"[HTML {i // 1500}] {html[i:i + 1500]!r}", file=sys.stderr)
     raise ValueError("Philippines の行が見つからない")
 
 
