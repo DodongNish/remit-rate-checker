@@ -85,34 +85,26 @@ def to_rate(text):
     return rate
 
 
+SBI_ENTRY = "https://ires.remit.co.jp/IRESWeb/ExchangeDirect.jsf"
+
+
 def fetch_sbi():
-    """SBI Remitからレートを取得する。"""
-
-    # JSESSIONID が発行されるので Session を使う
+    # SBI は ExchangeDirect.jsf(入口)を経由してセッションを作ってから
+    # Exchange_Rate.jsf に転送される。直接アクセスだと表が空になるため、同じ順で辿る。
     with requests.Session() as s:
-        soup = get_soup(URLS["SBI Remit"], s)
-
+        s.headers.update({"User-Agent": UA, "Accept-Language": "ja,en;q=0.8"})
+        s.get(SBI_ENTRY, timeout=TIMEOUT)  # Cookie(JSESSIONID)を受け取る
+        r = s.get(URLS["SBI Remit"], headers={"Referer": SBI_ENTRY}, timeout=TIMEOUT)
+        r.raise_for_status()
+        r.encoding = "utf-8"
+        soup = BeautifulSoup(r.text, "html.parser")
     rows = []
-
     for tr in soup.find_all("tr"):
-        tds = [
-            squash(td.get_text(" "))
-            for td in tr.find_all("td")
-        ]
-
-        if (
-            len(tds) >= 4
-            and tds[0] == "Philippines"
-            and "PHP" in tds[2]
-        ):
-            rows.append({
-                "method": tds[3],
-                "rate": to_rate(tds[2]),
-            })
-
+        tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
+        if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
+            rows.append({"method": tds[3], "rate": to_rate(tds[2])})
     if not rows:
         raise ValueError("Philippines の行が見つからない")
-
     return rows
 
 
