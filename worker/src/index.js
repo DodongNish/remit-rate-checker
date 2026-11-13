@@ -1,3 +1,5 @@
+import { buildPushPayload } from "@block65/webcrypto-web-push";
+
 const PROVIDERS = [
   {
     name: "Smiles",
@@ -310,62 +312,179 @@ async function fetchProvider(provider) {
   }
 }
 
+
+async function fetchAllProviders() {
+  return await Promise.all(PROVIDERS.map(fetchProvider));
+}
+
+function getRanking(providers) {
+  return providers
+    .flatMap((provider) => (provider.rates || []).map((rate) => ({
+      id: provider.name + "::" + (rate.method || "Not specified"),
+      name: provider.name,
+      method: rate.method || "Not specified",
+      rate: Number(rate.rate),
+    })))
+    .filter((entry) => Number.isFinite(entry.rate) && entry.rate > 0)
+    .sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name) || a.method.localeCompare(b.method))
+    .map((entry) => entry.id);
+}
+
+function jsonResponse(data, status = 200, corsHeaders = {}) {
+  return Response.json(data, {
+    status,
+    headers: { ...corsHeaders, "Cache-Control": "no-store, max-age=0" },
+  });
+}
+
+async function subscriptionKey(endpoint) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint));
+  return "subscription:" + [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function saveSubscription(request, env, corsHeaders) {
+  let subscription;
+  try { subscription = await request.json(); }
+  catch { return jsonResponse({ error: "Invalid JSON body" }, 400, corsHeaders); }
+  if (
+    typeof subscription?.endpoint !== "string" ||
+    !subscription.endpoint.startsWith("https://") ||
+    typeof subscription?.keys?.p256dh !== "string" ||
+    typeof subscription?.keys?.auth !== "string"
+  ) {
+    return jsonResponse({ error: "Invalid push subscription" }, 400, corsHeaders);
+  }
+  await env.PUSH_KV.put(await subscriptionKey(subscription.endpoint), JSON.stringify(subscription));
+  return jsonResponse({ ok: true }, 201, corsHeaders);
+}
+
+async function removeSubscription(request, env, corsHeaders) {
+  let body;
+  try { body = await request.json(); }
+  catch { return jsonResponse({ error: "Invalid JSON body" }, 400, corsHeaders); }
+  if (typeof body?.endpoint !== "string" || !body.endpoint.startsWith("https://")) {
+    return jsonResponse({ error: "Invalid subscription endpoint" }, 400, corsHeaders);
+  }
+  await env.PUSH_KV.delete(await subscriptionKey(body.endpoint));
+  return jsonResponse({ ok: true }, 200, corsHeaders);
+}
+
+async function sendRankingNotifications(env, ranking) {
+  const topEntries = ranking.slice(0, 3).map((id, index) => {
+    const [provider, method] = id.split("::");
+    return (index + 1) + ". " + provider + " — " + method;
+  });
+  const payloadData = JSON.stringify({
+    title: "Remittance ranking changed",
+    body: "The exchange-rate ranking has changed.\\n" + topEntries.join("\\n"),
+    url: "https://dodongnish.github.io/remit-rate-checker/",
+  });
+  const vapid = {
+    subject: "https://github.com/DodongNish/remit-rate-checker",
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  };
+  let cursor;
+  do {
+    const page = await env.PUSH_KV.list({ prefix: "subscription:", cursor, limit: 100 });
+    await Promise.all(page.keys.map(async ({ name }) => {
+      const raw = await env.PUSH_KV.get(name);
+      if (!raw) return;
+      try {
+        const subscription = JSON.parse(raw);
+        const pushRequest = await buildPushPayload(
+          { data: payloadData, options: { ttl: 3600 } },
+          subscription,
+          vapid,
+        );
+        const response = await fetch(subscription.endpoint, pushRequest);
+        if (response.status === 404 || response.status === 410) {
+          await env.PUSH_KV.delete(name);
+        } else if (!response.ok) {
+          console.error("Push delivery failed:", response.status, name);
+        }
+      } catch (error) {
+        console.error("Push delivery error:", name, error);
+      }
+    }));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+}
+
+async function checkRankingAndNotify(env) {
+  if (!env.PUSH_KV || !env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
+    console.error("Push notification configuration is incomplete.");
+    return;
+  }
+  const providers = await fetchAllProviders();
+  const complete = providers.length === PROVIDERS.length && providers.every((provider) => !provider.error && provider.rates?.length);
+  if (!complete) {
+    console.error("Ranking check skipped because one or more providers failed.");
+    return;
+  }
+  const ranking = getRanking(providers);
+  if (!ranking.length) return;
+  const previousRaw = await env.PUSH_KV.get("previous-ranking");
+  if (!previousRaw) {
+    await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+    return;
+  }
+  let previous;
+  try { previous = JSON.parse(previousRaw); }
+  catch { previous = null; }
+  if (!Array.isArray(previous) || previous.length !== ranking.length || previous.some((id) => !ranking.includes(id))) {
+    await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+    return;
+  }
+  const changed = previous.some((id, index) => id !== ranking[index]);
+  if (!changed) return;
+  await sendRankingNotifications(env, ranking);
+  await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+}
+
 export default {
-  async fetch(request) {
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(checkRankingAndNotify(env));
+  },
+
+  async fetch(request, env) {
     const url = new URL(request.url);
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
-    if (url.pathname === "/api/debug/sbi" && request.method === "GET") {
-      try {
-        return Response.json(await inspectSBI(), {
-          headers: { ...corsHeaders, "Cache-Control": "no-store, max-age=0" },
-        });
-      } catch (error) {
-        return Response.json(
-          { error: error instanceof Error ? error.message : String(error) },
-          { status: 502, headers: corsHeaders },
-        );
-      }
-    }
-    if (url.pathname === "/api/debug/city-express" && request.method === "GET") {
-      try {
-        return Response.json(await inspectCityExpress(), {
-          headers: { ...corsHeaders, "Cache-Control": "no-store, max-age=0" },
-        });
-      } catch (error) {
-        return Response.json(
-          { error: error instanceof Error ? error.message : String(error) },
-          { status: 502, headers: corsHeaders },
-        );
-      }
-    }
-    if (url.pathname !== "/api/rates") {
-      return Response.json({ error: "Not found" }, { status: 404, headers: corsHeaders });
-    }
-    if (request.method !== "GET") {
-      return Response.json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+
+    if (url.pathname === "/api/push/public-key" && request.method === "GET") {
+      if (!env.VAPID_PUBLIC_KEY) return jsonResponse({ error: "Push notifications are not configured" }, 503, corsHeaders);
+      return jsonResponse({ publicKey: env.VAPID_PUBLIC_KEY }, 200, corsHeaders);
     }
 
-    const providers = await Promise.all(PROVIDERS.map(fetchProvider));
+    if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
+      return await saveSubscription(request, env, corsHeaders);
+    }
+
+    if (url.pathname === "/api/push/subscribe" && request.method === "DELETE") {
+      return await removeSubscription(request, env, corsHeaders);
+    }
+
+    if (url.pathname !== "/api/rates") {
+      return jsonResponse({ error: "Not found" }, 404, corsHeaders);
+    }
+    if (request.method !== "GET") {
+      return jsonResponse({ error: "Method not allowed" }, 405, corsHeaders);
+    }
+
+    const providers = await fetchAllProviders();
     const successful = providers.filter((provider) => provider.rates?.length);
-    const body = {
+    return jsonResponse({
       updated: new Date().toISOString(),
       pair: "JPY/PHP",
       providers,
-    };
-    return Response.json(body, {
-      headers: {
-        ...corsHeaders,
-        "Cache-Control": "no-store, max-age=0",
-      },
-      status: successful.length ? 200 : 502,
-    });
+    }, successful.length ? 200 : 502, corsHeaders);
   },
 };
