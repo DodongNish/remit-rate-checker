@@ -207,7 +207,7 @@
 
     <div class="table-wrap">
       <table aria-live="polite">
-        <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th></tr></thead>
+        <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th><th scope="col">Rate updated</th></tr></thead>
         <tbody id="rates"></tbody>
       </table>
     </div>
@@ -229,7 +229,7 @@
       for (const provider of data.providers || []) {
         if (provider.error) { entries.push({ provider, error: provider.error }); continue; }
         for (const rate of provider.rates || []) {
-          if (Number.isFinite(Number(rate.rate))) entries.push({ provider, method: rate.method || "Not specified", rate: Number(rate.rate) });
+          if (Number.isFinite(Number(rate.rate))) entries.push({ provider, method: rate.method || "Not specified", rate: Number(rate.rate), updatedAt: provider.updatedAt || null });
         }
       }
       const successful = entries.filter((entry) => !entry.error).sort((a, b) => b.rate - a.rate);
@@ -257,14 +257,16 @@
         const rateCell = document.createElement("td");
         rateCell.className = "rate";
         rateCell.textContent = entry.rate.toFixed(6) + " PHP";
-        tr.append(providerCell, methodCell, rateCell);
+        const updatedCell = document.createElement("td");
+        updatedCell.textContent = formatUpdatedAt(entry.updatedAt);
+        tr.append(providerCell, methodCell, rateCell, updatedCell);
         tbody.appendChild(tr);
       }
       for (const entry of failed) {
         const tr = document.createElement("tr");
         tr.className = "error";
         const cell = document.createElement("td");
-        cell.colSpan = 3;
+        cell.colSpan = 4;
         cell.textContent = entry.provider.name + ": Unable to retrieve rates (" + entry.error + ")";
         tr.appendChild(cell);
         tbody.appendChild(tr);
@@ -278,6 +280,15 @@
         tbody.appendChild(tr);
       }
     }
+    function formatUpdatedAt(value) {
+      if (!value) return "Not provided";
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime()) && /T/.test(value)) {
+        return date.toLocaleString("en-GB", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }) + " JST";
+      }
+      return value + (value.endsWith("JST") ? "" : " JST");
+    }
+
     // Cloudflare Worker API endpoint.
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
