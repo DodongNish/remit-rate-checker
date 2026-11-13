@@ -203,7 +203,7 @@
 <body>
   <main>
     <h1>JPY to PHP Remittance Rates</h1>
-    <p class="sub" id="updated">Loading rates…</p>
+    <p class="sub" id="current-time">Loading rates…</p>
 
     <div class="table-wrap">
       <table aria-live="polite">
@@ -288,6 +288,26 @@
       return value + (value.endsWith("JST") ? "" : " JST");
     }
 
+    // Display the current time in Japan, including seconds.
+    function updateCurrentTime() {
+      $("current-time").textContent =
+        "Current time: " +
+        new Date().toLocaleString("en-GB", {
+          timeZone: "Asia/Tokyo",
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }) +
+        " JST";
+    }
+
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+
     // Cloudflare Worker API endpoint.
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
@@ -309,7 +329,7 @@
             dateStyle: "medium",
             timeStyle: "short",
           }) +
-          " (JST) · Auto-refresh: every 1 minute";
+          " (JST)";
         render(data);
         hasLoadedRates = true;
       } catch (error) {
