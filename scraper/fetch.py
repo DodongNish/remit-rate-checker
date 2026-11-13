@@ -53,33 +53,52 @@ def to_rate(text):
 #         raise ValueError("Philippines の行が見つからない")
 #     return rows
 
-def fetch_sbi():
-    # JSESSIONID が発行されるので Session を使う
-    with requests.Session() as s:
-        soup = get_soup(URLS["SBI Remit"], s)
+def _sbi_rows(soup):
     rows = []
     for tr in soup.find_all("tr"):
         tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
-        if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
+        if len(tds) >= 4 and tds[0] in ("Philippines", "フィリピン") and "PHP" in tds[2]:
             rows.append({"method": tds[3], "rate": to_rate(tds[2])})
-    if rows:
-        return rows
+    return rows
 
-    # 診断: 表を埋める AJAX の送り方を調べる
-    form = soup.find("form")
-    print(f"[DEBUG] SBI: form attrs={form.attrs if form else None}", file=sys.stderr)
-    print(f"[DEBUG] SBI: inputs={[(i.get('name'), (i.get('value') or '')[:30]) for i in soup.find_all('input')]}",
-          file=sys.stderr)
-    print(f"[DEBUG] SBI: buttons={[(b.get('id'), b.get('onclick')) for b in soup.find_all(['button','a']) if b.get('id')]}",
-          file=sys.stderr)
-    t = soup.find("table")
-    print(f"[DEBUG] SBI: table={str(t)[:700]!r}", file=sys.stderr)
-    print(f"[DEBUG] SBI: script_src={[x.get('src') for x in soup.find_all('script') if x.get('src')]}",
-          file=sys.stderr)
-    for i, sc in enumerate(soup.find_all("script")):
-        body = sc.get_text()
-        if any(k in body for k in ("ab(", "ajax", "jsf", "remoteCommand", "poll", "Poll")):
-            print(f"[DEBUG] SBI: script{i}={squash(body)[:1200]!r}", file=sys.stderr)
+
+def fetch_sbi():
+    from urllib.parse import urljoin
+    url = URLS["SBI Remit"]
+    with requests.Session() as s:
+        soup = get_soup(url, s)
+        rows = _sbi_rows(soup)
+        if rows:
+            return rows
+
+        # 試行1: フォームをそのまま POST する
+        form = soup.find("form")
+        data = {i["name"]: i.get("value", "") for i in form.find_all("input") if i.get("name")}
+        r = s.post(urljoin(url, form["action"]), data=data,
+                   headers={"User-Agent": UA, "Referer": url}, timeout=TIMEOUT)
+        r.encoding = r.apparent_encoding
+        soup2 = BeautifulSoup(r.text, "html.parser")
+        rows = _sbi_rows(soup2)
+        print(f"[DEBUG] SBI POST: status={r.status_code} rows={len(rows)} "
+              f"text_len={len(squash(soup2.get_text(' ')))} "
+              f"has_PH={'Philippines' in r.text or 'フィリピン' in r.text}", file=sys.stderr)
+        if rows:
+            return rows
+
+        # 診断: JS の通信まわりを抜き出す
+        for name in ("main.js", "form.js"):
+            try:
+                js = s.get(urljoin(url, "js/" + name), headers={"User-Agent": UA}, timeout=TIMEOUT).text
+            except Exception as e:
+                print(f"[DEBUG] SBI {name}: {e}", file=sys.stderr)
+                continue
+            print(f"[DEBUG] SBI {name}: len={len(js)}", file=sys.stderr)
+            n = 0
+            for m in re.finditer(r"ajax|\$\.post|\$\.get|XMLHttpRequest|fetch\(|Exchange|rate|\.jsf|submit\(", js, re.I):
+                print(f"[DEBUG] SBI {name}@{m.start()}: {squash(js[max(0, m.start()-120):m.start()+260])!r}", file=sys.stderr)
+                n += 1
+                if n >= 8:
+                    break
     raise ValueError("Philippines の行が見つからない")
 
 
