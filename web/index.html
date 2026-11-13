@@ -408,12 +408,12 @@
       let date;
 
       // Timestamps with an explicit timezone are absolute times.
-      if (/T.*(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(text)) {
+      if (/T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
         date = new Date(text);
       } else {
         // Provider timestamps without a timezone are treated as Japan time.
-        const numericMatch = text.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T,]+(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
-        const englishMatch = text.match(/^(\\d{4})\\s+([A-Za-z]+)\\s+(\\d{1,2}),?\\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\s+(\\d{1,2}):(\\d{2})/i);
+        const numericMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?/);
+        const englishMatch = text.match(/^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2}):(\d{2})/i);
         if (numericMatch) {
           const [, year, month, day, hour, minute] = numericMatch;
           date = new Date(Date.UTC(
