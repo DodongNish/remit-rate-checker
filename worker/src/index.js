@@ -161,91 +161,48 @@ async function inspectSBI() {
     "Accept": "text/html,application/xhtml+xml",
     "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
   };
-  const initial = await fetch(url, {
-    headers,
-    redirect: "manual",
-    signal: AbortSignal.timeout(15000),
-  });
+  const initial = await fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(15000) });
   const initialHtml = await initial.text();
   const setCookie = initial.headers.get("set-cookie") || "";
-  const cookies = [...setCookie.matchAll(/(?:^|,\s*)([^=;,\s]+)=([^;,\s]+)/g)]
-    .map((m) => m[1] + "=" + m[2]);
-  const cookie = cookies.join("; ");
-  const token = initialHtml.match(/name="uniqueToken"\s+value="([^"]+)"/i)?.[1];
-  const viewState = initialHtml.match(/name="javax\.faces\.ViewState"\s+id="[^"]+"\s+value="([^"]+)"/i)?.[1];
+  const cookie = [...setCookie.matchAll(/(?:^|,\\s*)([^=;,\\s]+)=([^;,\\s]+)/g)].map((m) => m[1] + "=" + m[2]).join("; ");
+  const token = initialHtml.match(/name="uniqueToken"\\s+value="([^"]+)"/i)?.[1];
+  const viewState = initialHtml.match(/name="javax\\.faces\\.ViewState"\\s+id="[^"]+"\\s+value="([^"]+)"/i)?.[1];
   const formData = new URLSearchParams();
   formData.set("dummyForm", "dummyForm");
   if (token) formData.set("uniqueToken", token);
   formData.set("mulClickToken", "");
   formData.set("dummyForm:doInit", "");
   if (viewState) formData.set("javax.faces.ViewState", viewState);
-
   let postResult = null;
   let exchangePage = null;
   if (token && viewState && cookie) {
     const posted = await fetch(url, {
       method: "POST",
-      headers: {
-        ...headers,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Cookie": cookie,
-        "Origin": "https://ires.remit.co.jp",
-        "Referer": url,
-      },
-      body: formData.toString(),
-      redirect: "manual",
-      signal: AbortSignal.timeout(20000),
+      headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded", "Cookie": cookie, "Origin": "https://ires.remit.co.jp", "Referer": url },
+      body: formData.toString(), redirect: "manual", signal: AbortSignal.timeout(20000),
     });
     const postHtml = await posted.text();
     const location = posted.headers.get("location");
-    postResult = {
-      status: posted.status,
-      location,
-      setCookie: posted.headers.get("set-cookie"),
-      htmlLength: postHtml.length,
-      bodyStart: postHtml.slice(0, 1000),
-    };
-
+    postResult = { status: posted.status, location, setCookie: posted.headers.get("set-cookie"), htmlLength: postHtml.length, bodyStart: postHtml.slice(0, 1000) };
     if (posted.status >= 300 && posted.status < 400 && location) {
       const target = new URL(location, url);
       target.protocol = "https:";
       const page = await fetch(target.toString(), {
         headers: { ...headers, "Cookie": cookie, "Referer": url },
-        redirect: "manual",
-        signal: AbortSignal.timeout(20000),
+        redirect: "manual", signal: AbortSignal.timeout(20000),
       });
       const html = await page.text();
       exchangePage = {
-        requestedUrl: target.toString(),
-        status: page.status,
-        location: page.headers.get("location"),
-        setCookie: page.headers.get("set-cookie"),
-        htmlLength: html.length,
-        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
-        tables: [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)]
-          .map((m) => plainText(m[1]).slice(0, 8000)),
-        rows: [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
-          .map((m) => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => plainText(c[1])))
-          .filter((cells) => cells.length),
-        textPreview: plainText(html).slice(0, 12000),
-        bodyStart: html.slice(0, 18000),
+        requestedUrl: target.toString(), status: page.status, location: page.headers.get("location"),
+        setCookie: page.headers.get("set-cookie"), htmlLength: html.length,
+        title: html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1] ?? null,
+        tables: [...html.matchAll(/<table\\b[^>]*>([\\s\\S]*?)<\\/table>/gi)].map((m) => plainText(m[1]).slice(0, 8000)),
+        rows: [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map((m) => [...m[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map((c) => plainText(c[1]))).filter((cells) => cells.length),
+        textPreview: plainText(html).slice(0, 12000), bodyStart: html.slice(0, 18000),
       };
     }
   }
-
-  return {
-    initial: {
-      status: initial.status,
-      finalUrl: initial.url,
-      setCookie,
-      cookie,
-      htmlLength: initialHtml.length,
-      tokenFound: Boolean(token),
-      viewStateFound: Boolean(viewState),
-    },
-    postResult,
-    exchangePage,
-  };
+  return { initial: { status: initial.status, finalUrl: initial.url, setCookie, cookie, htmlLength: initialHtml.length, tokenFound: Boolean(token), viewStateFound: Boolean(viewState) }, postResult, exchangePage };
 }
 async function fetchProvider(provider) {
   try {
