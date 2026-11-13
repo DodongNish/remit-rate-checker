@@ -87,7 +87,7 @@ async function inspectCityExpress() {
   } catch (error) {
     apiProbe = { error: error instanceof Error ? error.message : String(error) };
   }
-  const scriptTags = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
   const scripts = await Promise.all(scriptTags.map(async (match) => {
     const src = match[1].match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
     const inline = match[2];
