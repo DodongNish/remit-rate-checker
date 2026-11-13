@@ -3,7 +3,8 @@ const PROVIDERS = [
     name: "Smiles",
     url: "https://www.smileswallet.com/japan/exchange-rates/#:~:text=Philippines",
     getUpdatedAt(html) {
-      return html.match(/(\d{4}\s+[A-Za-z]+\s+\d{1,2},?\s+\w+\s+\d{1,2}:\d{2})/)?.[1] ?? null;
+      const text = plainText(html);
+      return text.match(/(\d{4}\s+[A-Za-z]+\s+\d{1,2},?\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{1,2}:\d{2})/i)?.[1] ?? null;
     },
     parse(html) {
       const anchors = [...html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)];
