@@ -153,7 +153,55 @@ async function inspectCityExpress() {
   };
 }
 
-async function fetchProvider(provider) {
+
+async function inspectSBI() {
+  const urls = [
+    "https://www.remit.co.jp/en/kaigaisoukin/exchangeratecommission/exchange/",
+    "https://ires.remit.co.jp/IRESWeb/Exchange_Rate.jsf",
+    "https://ires.remit.co.jp/IRESWeb/ExchangeDirect.jsf",
+  ];
+  const results = [];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "en,ja;q=0.8",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(15000),
+      });
+      const html = await response.text();
+      const links = [...html.matchAll(/<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi)]
+        .map((m) => ({ attrs: m[1].slice(0, 500), text: plainText(m[2]).slice(0, 180) }))
+        .filter((x) => /exchange|rate|ires|philipp|php/i.test(x.attrs + " " + x.text))
+        .slice(0, 40);
+      const forms = [...html.matchAll(/<form\\b([^>]*)>([\\s\\S]*?)<\\/form>/gi)]
+        .map((m) => ({
+          attrs: m[1].slice(0, 1000),
+          fields: [...m[2].matchAll(/<(input|select|button|textarea)\\b([^>]*)>/gi)]
+            .map((f) => f[1] + " " + f[2].slice(0, 500)).slice(0, 80),
+        }));
+      results.push({
+        requestedUrl: url,
+        finalUrl: response.url,
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        setCookie: response.headers.get("set-cookie"),
+        htmlLength: html.length,
+        title: html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1] ?? null,
+        links,
+        forms,
+        bodyStart: html.slice(0, 14000),
+      });
+    } catch (error) {
+      results.push({ requestedUrl: url, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { results };
+}
+\nasync function fetchProvider(provider) {
   try {
     if (provider.fetchRates) {
       return { name: provider.name, url: provider.url, rates: await provider.fetchRates() };
@@ -189,6 +237,18 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
+    }
+    if (url.pathname === "/api/debug/sbi" && request.method === "GET") {
+      try {
+        return Response.json(await inspectSBI(), {
+          headers: { ...corsHeaders, "Cache-Control": "no-store, max-age=0" },
+        });
+      } catch (error) {
+        return Response.json(
+          { error: error instanceof Error ? error.message : String(error) },
+          { status: 502, headers: corsHeaders },
+        );
+      }
     }
     if (url.pathname === "/api/debug/city-express" && request.method === "GET") {
       try {
