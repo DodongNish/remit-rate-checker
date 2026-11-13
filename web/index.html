@@ -294,12 +294,19 @@
         date = new Date(text);
       } else {
         // Provider timestamps without a timezone are treated as Japan time.
-        const match = text.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T,]+(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
-        if (match) {
-          const [, year, month, day, hour, minute] = match;
+        const numericMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?/);
+        const englishMatch = text.match(/^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2}):(\d{2})/i);
+        if (numericMatch) {
+          const [, year, month, day, hour, minute] = numericMatch;
           date = new Date(Date.UTC(
             Number(year), Number(month) - 1, Number(day),
             Number(hour) - 9, Number(minute)
+          ));
+        } else if (englishMatch) {
+          const [, year, monthName, day, hour, minute] = englishMatch;
+          const month = new Date(Date.parse(monthName + " 1, 2000")).getMonth();
+          date = new Date(Date.UTC(
+            Number(year), month, Number(day), Number(hour) - 9, Number(minute)
           ));
         } else {
           date = new Date(text);
