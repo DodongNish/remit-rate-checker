@@ -253,7 +253,7 @@
           providerCell.appendChild(tag);
         }
         const methodCell = document.createElement("td");
-        methodCell.textContent = entry.method;
+        methodCell.textContent = entry.method.replace(/口座宛/g, "Bank Deposit");
         const rateCell = document.createElement("td");
         rateCell.className = "rate";
         rateCell.textContent = entry.rate.toFixed(6) + " PHP";
@@ -278,7 +278,7 @@
         tbody.appendChild(tr);
       }
     }
-    // Cloudflare Worker のデプロイ後、下記を実際の workers.dev URL に置き換えてください。
+    // Cloudflare Worker API endpoint.
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
     fetch(`${API_URL}/api/rates`, { cache: "no-store" })
