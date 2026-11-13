@@ -343,6 +343,11 @@ async function subscriptionKey(endpoint) {
 }
 
 async function saveSubscription(request, env, corsHeaders) {
+  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+    return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
+  }
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (contentLength > 8192) return jsonResponse({ error: "Subscription payload too large" }, 413, corsHeaders);
   let subscription;
   try { subscription = await request.json(); }
   catch { return jsonResponse({ error: "Invalid JSON body" }, 400, corsHeaders); }
@@ -359,6 +364,9 @@ async function saveSubscription(request, env, corsHeaders) {
 }
 
 async function removeSubscription(request, env, corsHeaders) {
+  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+    return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
+  }
   let body;
   try { body = await request.json(); }
   catch { return jsonResponse({ error: "Invalid JSON body" }, 400, corsHeaders); }
