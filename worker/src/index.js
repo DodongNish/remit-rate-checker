@@ -3,10 +3,10 @@ const PROVIDERS = [
     name: "Smiles",
     url: "https://www.smileswallet.com/japan/exchange-rates/#:~:text=Philippines",
     parse(html) {
-      const anchors = [...html.matchAll(/<a\\b[^>]*>([\\s\\S]*?)<\\/a>/gi)];
+      const anchors = [...html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)];
       for (const match of anchors) {
         const text = plainText(match[1]);
-        const rate = text.match(/^(\\d+(?:\\.\\d+)?)\\s*PHP$/i);
+        const rate = text.match(/^(\d+(?:\.\d+)?)\s*PHP$/i);
         if (rate) return [{ method: "App", rate: Number(rate[1]) }];
       }
       throw new Error("PHP rate not found");
@@ -17,7 +17,7 @@ const PROVIDERS = [
     url: "https://sendmoney.co.jp/en/fx-rate#:~:text=Philippines",
     parse(html) {
       const text = plainText(html);
-      const rate = text.match(/\\(PHP\\)\\s*PHP\\s*(\\d+(?:\\.\\d+)?)/i);
+      const rate = text.match(/\(PHP\)\s*PHP\s*(\d+(?:\.\d+)?)/i);
       if (!rate) throw new Error("PHP rate not found");
       return [{ method: "App", rate: Number(rate[1]) }];
     },
@@ -26,17 +26,17 @@ const PROVIDERS = [
     name: "City Express",
     url: "https://www.cityremit.com/en/exchange-rates/#:~:text=PHILIPPINES",
     parse(html) {
-      const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
+      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
       for (const row of rows) {
-        const cells = [...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)]
+        const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1]));
         if (cells.length && /^Philippines$/i.test(cells[0])) {
-          const rate = cells[cells.length - 1].match(/(\\d+(?:\\.\\d+)?)/);
+          const rate = cells[cells.length - 1].match(/(\d+(?:\.\d+)?)/);
           if (rate) return [{ method: "App", rate: Number(rate[1]) }];
         }
       }
-      const text = plainText(html).replace(/\\s+/g, "");
-      const fallback = text.match(/PhilippinesPHP(\\d+(?:\\.\\d+)?)/i);
+      const text = plainText(html).replace(/\s+/g, "");
+      const fallback = text.match(/PhilippinesPHP(\d+(?:\.\d+)?)/i);
       if (fallback) return [{ method: "App", rate: Number(fallback[1]) }];
       throw new Error("Philippines rate not found");
     },
@@ -45,8 +45,8 @@ const PROVIDERS = [
 
 function plainText(value) {
   return value
-    .replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi, " ")
-    .replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi, " ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;|&#160;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -54,7 +54,7 @@ function plainText(value) {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -68,7 +68,7 @@ async function fetchProvider(provider) {
       },
       signal: AbortSignal.timeout(15000),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
     const html = await response.text();
     return { name: provider.name, url: provider.url, rates: provider.parse(html) };
   } catch (error) {
