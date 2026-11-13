@@ -33,7 +33,7 @@ const PROVIDERS = [
         "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
       };
       const initial = await fetch(endpoint, { headers, redirect: "manual", signal: AbortSignal.timeout(15000) });
-      if (!initial.ok) throw new Error(\`Initial page HTTP \${initial.status}\`);
+      if (!initial.ok) throw new Error("Initial page HTTP " + initial.status);
       const initialHtml = await initial.text();
       const setCookie = initial.headers.get("set-cookie") || "";
       const cookie = [...setCookie.matchAll(/(?:^|,\s*)([^=;,\s]+)=([^;,\s]+)/g)]
@@ -56,7 +56,7 @@ const PROVIDERS = [
         },
         body: form.toString(), redirect: "manual", signal: AbortSignal.timeout(20000),
       });
-      if (posted.status < 300 || posted.status >= 400) throw new Error(\`SBI initialization HTTP \${posted.status}\`);
+      if (posted.status < 300 || posted.status >= 400) throw new Error("SBI initialization HTTP " + posted.status);
       const location = posted.headers.get("location");
       if (!location) throw new Error("SBI exchange-rate redirect not found");
       const target = new URL(location, endpoint);
@@ -65,7 +65,7 @@ const PROVIDERS = [
         headers: { ...headers, "Cookie": cookie, "Referer": endpoint },
         redirect: "manual", signal: AbortSignal.timeout(20000),
       });
-      if (!page.ok) throw new Error(\`SBI exchange-rate page HTTP \${page.status}\`);
+      if (!page.ok) throw new Error("SBI exchange-rate page HTTP " + page.status);
       const html = await page.text();
       const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
         .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
