@@ -105,11 +105,16 @@ async function inspectCityExpress() {
       const scriptText = await scriptResponse.text();
       const matches = [...scriptText.matchAll(/exchange|currency|philippines|PHP|api|graphql|fetch|axios/gi)]
         .slice(0, 15).map((item) => scriptText.slice(Math.max(0, item.index - 100), Math.min(scriptText.length, item.index + 180)));
-      const deepInspection = ["api/public/rates", "58443", "apiBase", "baseUrl", "NEXT_PUBLIC"].map((term) => {
+      const deepInspection = ["api/public/rates", "58443", "31945", "apiBase", "baseUrl", "NEXT_PUBLIC", "apiUrl", "API_URL", "https://"].map((term) => {
         const index = scriptText.indexOf(term);
-        return { term, context: index >= 0 ? scriptText.slice(Math.max(0, index - 1800), Math.min(scriptText.length, index + 2400)) : null };
+        return { term, context: index >= 0 ? scriptText.slice(Math.max(0, index - 1800), Math.min(scriptText.length, index + 2600)) : null };
       }).filter((item) => item.context);
-      return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches, deepInspection };
+      const moduleDefinitions = [...scriptText.matchAll(/(?:^|[,\\[])31945\\s*,/g)].slice(0, 5).map((item) => ({
+        offset: item.index,
+        context: scriptText.slice(Math.max(0, item.index - 500), Math.min(scriptText.length, item.index + 1800)),
+      }));
+      const urlLiterals = [...new Set(scriptText.match(/https?:\\/\\/[^"'\\s`]+/g) ?? [])].slice(0, 40);
+      return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches, deepInspection, moduleDefinitions, urlLiterals };
     } catch (error) {
       return { src: scriptUrl, error: error instanceof Error ? error.message : String(error) };
     }
