@@ -76,11 +76,23 @@ async function inspectCityExpress() {
       .map((cell) => plainText(cell[1])))
     .filter((cells) => cells.some((cell) => /Philippines|0\.395|0\.397/i.test(cell)));
   const text = plainText(html);
+  const scriptTags = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = scriptTags.map((match) => {
+    const src = match[1].match(/\\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
+    const inline = match[2];
+    const relevant = /exchange.?rate|currency|philippines|\\bPHP\\b|\\bapi\\b|ajax|graphql/i.test(inline);
+    return {
+      src: src ? new URL(src, response.url).href : null,
+      inlineLength: inline.length,
+      relevantInline: !src && relevant ? inline.slice(0, 2000) : undefined,
+    };
+  }).filter((script) => script.src || script.relevantInline);
   return {
     fetchedUrl: response.url,
     httpStatus: response.status,
     htmlLength: html.length,
     matchingRows: rows,
+    scripts,
     textAroundRates: ["0.395", "0.397"].map((term) => {
       const index = text.indexOf(term);
       return { term, context: index >= 0 ? text.slice(Math.max(0, index - 100), index + 150) : null };
