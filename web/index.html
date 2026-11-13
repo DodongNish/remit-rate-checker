@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JPY → PHP 送金レート比較</title>
+  <title>JPY to PHP Remittance Rate Comparison</title>
   <style>
     :root {
       --bg: #f2f5f7;
@@ -40,7 +40,7 @@
       margin: 0;
       background: var(--bg);
       color: var(--ink);
-      font: 16px/1.6 "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+      font: 16px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     main {
@@ -60,6 +60,17 @@
       font-size: .9rem;
     }
 
+    table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr.best { background: var(--best-bg); }
+    td.rate { text-align: right; font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.provider a { color: inherit; text-underline-offset: 3px; }
+    .tag { display: inline-block; color: var(--best); font-size: .75rem; font-weight: 650; margin-left: 8px; }
+    tr.error td { color: var(--err); }
+    .table-wrap { overflow-x: auto; border-radius: 8px; }
+    @media (max-width: 520px) { th, td { padding: 10px 8px; font-size: .85rem; } td.rate { font-size: .95rem; } }
     ol {
       list-style: none;
       margin: 0;
@@ -191,57 +202,82 @@
 
 <body>
   <main>
-    <h1>JPY → PHP 送金レート比較</h1>
-    <p class="sub" id="updated">読み込み中…</p>
+    <h1>JPY to PHP Remittance Rates</h1>
+    <p class="sub" id="updated">Loading rates…</p>
 
-    <ol id="list" aria-live="polite"></ol>
+    <div class="table-wrap">
+      <table aria-live="polite">
+        <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th></tr></thead>
+        <tbody id="rates"></tbody>
+      </table>
+    </div>
 
     <footer>
-      <p>表示は参考レートです。実際のレートは送金の成立時点で決まります。</p>
-      <p>手数料は含みません。手数料は各社のページで確認してください。</p>
+      <p>Rates are indicative and may change. The applicable rate is determined when the transfer is processed.</p>
+      <p>Transfer fees are not included. Please check each provider’s website for fees and final terms.</p>
+      <p>Rates are sorted from highest to lowest. The best available rate is highlighted.</p>
     </footer>
   </main>
 
   <script>
     const $ = (id) => document.getElementById(id);
 
-    function rows(data) {
-      const out = [];
-      for (const p of data.providers) {
-        if (p.error) { out.push({ p, error: true }); continue; }
-        for (const r of p.rates) out.push({ p, method: r.method, rate: r.rate });
-      }
-      return out;
-    }
-
     function render(data) {
-      const all = rows(data);
-      const ok = all.filter((x) => !x.error).sort((a, b) => b.rate - a.rate);
-      const failed = all.filter((x) => x.error);
-      const top = ok.length ? ok[0].rate : 1;
-      const list = $("list");
-      list.textContent = "";
-
-      ok.forEach((x, i) => {
-        const li = document.createElement("li");
-        if (i === 0) li.className = "best";
-        const pct = Math.max(8, (x.rate / top) * 100);
-        li.innerHTML = `
-      <span class="fill" style="width:${pct}%"></span>
-      <span class="name"><a href="${x.p.url}" target="_blank" rel="noopener">${x.p.name}</a>${i === 0 ? '<span class="tag">最も高い</span>' : ""}</span>
-      <span class="method">${x.method}</span>
-      <span class="rate">${x.rate.toFixed(4)}<small>PHP / 1 JPY</small></span>`;
-        list.appendChild(li);
-      });
-
-      failed.forEach((x) => {
-        const li = document.createElement("li");
-        li.className = "error";
-        li.textContent = `${x.p.name}: 今回は取得できませんでした`;
-        list.appendChild(li);
-      });
+      const tbody = $("rates");
+      tbody.textContent = "";
+      const entries = [];
+      for (const provider of data.providers || []) {
+        if (provider.error) { entries.push({ provider, error: provider.error }); continue; }
+        for (const rate of provider.rates || []) {
+          if (Number.isFinite(Number(rate.rate))) entries.push({ provider, method: rate.method || "Not specified", rate: Number(rate.rate) });
+        }
+      }
+      const successful = entries.filter((entry) => !entry.error).sort((a, b) => b.rate - a.rate);
+      const failed = entries.filter((entry) => entry.error);
+      const bestRate = successful.length ? successful[0].rate : null;
+      for (const [index, entry] of successful.entries()) {
+        const tr = document.createElement("tr");
+        if (index === 0) tr.className = "best";
+        const providerCell = document.createElement("td");
+        providerCell.className = "provider";
+        const link = document.createElement("a");
+        link.href = entry.provider.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = entry.provider.name;
+        providerCell.appendChild(link);
+        if (entry.rate === bestRate) {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = "Best rate";
+          providerCell.appendChild(tag);
+        }
+        const methodCell = document.createElement("td");
+        methodCell.textContent = entry.method;
+        const rateCell = document.createElement("td");
+        rateCell.className = "rate";
+        rateCell.textContent = entry.rate.toFixed(6) + " PHP";
+        tr.append(providerCell, methodCell, rateCell);
+        tbody.appendChild(tr);
+      }
+      for (const entry of failed) {
+        const tr = document.createElement("tr");
+        tr.className = "error";
+        const cell = document.createElement("td");
+        cell.colSpan = 3;
+        cell.textContent = entry.provider.name + ": Unable to retrieve rates (" + entry.error + ")";
+        tr.appendChild(cell);
+        tbody.appendChild(tr);
+      }
+      if (!successful.length && !failed.length) {
+        const tr = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 3;
+        cell.textContent = "No rates are currently available.";
+        tr.appendChild(cell);
+        tbody.appendChild(tr);
+      }
     }
-
     // Cloudflare Worker のデプロイ後、下記を実際の workers.dev URL に置き換えてください。
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
@@ -249,10 +285,10 @@
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((j) => {
         const d = new Date(j.updated);
-        $("updated").textContent = "最終更新: " + d.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }) + " (JST)";
+        $("updated").textContent = "Last updated: " + d.toLocaleString("en-GB", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }) + " (JST)";
         render(j);
       })
-      .catch(() => { $("updated").textContent = "レートを読み込めませんでした。時間をおいて再読み込みしてください。"; });
+      .catch(() => { $("updated").textContent = "Unable to load exchange rates. Please try refreshing the page."; });
   </script>
 </body>
 
