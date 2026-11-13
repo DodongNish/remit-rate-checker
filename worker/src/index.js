@@ -427,7 +427,8 @@ async function checkRankingAndNotify(env) {
   const providers = await fetchAllProviders();
   const complete = providers.length === PROVIDERS.length && providers.every((provider) => !provider.error && provider.rates?.length);
   if (!complete) {
-    console.error("Ranking check skipped because one or more providers failed.");
+    const failures = providers.filter((provider) => provider.error || !provider.rates?.length).map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
+    console.error("Ranking check skipped because one or more providers failed:", JSON.stringify(failures));
     return;
   }
   const ranking = getRanking(providers);
