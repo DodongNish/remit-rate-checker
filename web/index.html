@@ -68,8 +68,12 @@
     th { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
     tbody tr:last-child td { border-bottom: 0; }
     tbody tr.best { background: var(--best-bg); }
+    tbody tr.city-express { box-shadow: inset 3px 0 0 var(--bar); font-weight: 650; }
+    tbody tr.city-express td:first-child { font-weight: 750; }
     td.updated { white-space: nowrap; }
     td.rate { text-align: right; font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.previous-rate { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    td.current-rate { text-align: right; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     td.provider a { color: inherit; text-underline-offset: 3px; }
     .tag { display: inline-block; color: var(--best); font-size: .75rem; font-weight: 650; margin-left: 8px; }
     tr.error td { color: var(--err); }
@@ -212,7 +216,7 @@
 
     <div class="table-wrap">
       <table aria-live="polite">
-        <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th><th scope="col">Rate updated</th></tr></thead>
+        <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Previous</th><th scope="col" style="text-align:right">Current</th><th scope="col">Rate updated</th></tr></thead>
         <tbody id="rates"></tbody>
       </table>
     </div>
@@ -220,20 +224,39 @@
     <footer>
       <p>Rates are indicative and may change. The applicable rate is determined when the transfer is processed.</p>
       <p>Rates are sorted from highest to lowest. The best available rate is highlighted.</p>
+      <p>Previous shows the rate from the last successful refresh in this browser.</p>
     </footer>
   </main>
 
   <script>
     const $ = (id) => document.getElementById(id);
 
+    const PREVIOUS_RATES_KEY = "remit-rate-checker:previous-rates";
+
+    function readPreviousRates() {
+      try {
+        return JSON.parse(localStorage.getItem(PREVIOUS_RATES_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
     function render(data) {
+      const previousRates = readPreviousRates();
+      const currentRates = {};
       const tbody = $("rates");
       tbody.textContent = "";
       const entries = [];
       for (const provider of data.providers || []) {
         if (provider.error) { entries.push({ provider, error: provider.error }); continue; }
         for (const rate of provider.rates || []) {
-          if (Number.isFinite(Number(rate.rate))) entries.push({ provider, method: rate.method || "Not specified", rate: Number(rate.rate), updatedAt: provider.updatedAt || null });
+          if (Number.isFinite(Number(rate.rate))) {
+            const method = rate.method || "Not specified";
+            const key = provider.name + "::" + method;
+            const currentRate = Number(rate.rate);
+            entries.push({ provider, method, rate: currentRate, previousRate: previousRates[key], updatedAt: provider.updatedAt || null });
+            currentRates[key] = currentRate;
+          }
         }
       }
       const successful = entries.filter((entry) => !entry.error).sort((a, b) => b.rate - a.rate);
@@ -241,7 +264,8 @@
       const bestRate = successful.length ? successful[0].rate : null;
       for (const [index, entry] of successful.entries()) {
         const tr = document.createElement("tr");
-        if (index === 0) tr.className = "best";
+        if (index === 0) tr.classList.add("best");
+        if (entry.provider.name === "City Express") tr.classList.add("city-express");
         const providerCell = document.createElement("td");
         providerCell.className = "provider";
         const link = document.createElement("a");
@@ -258,28 +282,38 @@
         }
         const methodCell = document.createElement("td");
         methodCell.textContent = entry.method.replace(/口座宛/g, "Bank Deposit");
-        const rateCell = document.createElement("td");
-        rateCell.className = "rate";
-        rateCell.textContent = entry.rate.toFixed(6) + " PHP";
+        const previousCell = document.createElement("td");
+        previousCell.className = "previous-rate";
+        previousCell.textContent = Number.isFinite(entry.previousRate) ? entry.previousRate.toFixed(6) : "—";
+        const currentCell = document.createElement("td");
+        currentCell.className = "current-rate";
+        currentCell.textContent = entry.rate.toFixed(6);
         const updatedCell = document.createElement("td");
         updatedCell.className = "updated";
         updatedCell.textContent = formatUpdatedAt(entry.updatedAt);
-        tr.append(providerCell, methodCell, rateCell, updatedCell);
+        tr.append(providerCell, methodCell, previousCell, currentCell, updatedCell);
         tbody.appendChild(tr);
       }
       for (const entry of failed) {
         const tr = document.createElement("tr");
         tr.className = "error";
         const cell = document.createElement("td");
-        cell.colSpan = 4;
+        cell.colSpan = 5;
         cell.textContent = entry.provider.name + ": Unable to retrieve rates (" + entry.error + ")";
         tr.appendChild(cell);
         tbody.appendChild(tr);
       }
+      if (Object.keys(currentRates).length) {
+        try {
+          localStorage.setItem(PREVIOUS_RATES_KEY, JSON.stringify(currentRates));
+        } catch {
+          // The comparison still works for the current page session.
+        }
+      }
       if (!successful.length && !failed.length) {
         const tr = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 3;
+        cell.colSpan = 5;
         cell.textContent = "No rates are currently available.";
         tr.appendChild(cell);
         tbody.appendChild(tr);
