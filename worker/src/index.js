@@ -77,16 +77,28 @@ async function inspectCityExpress() {
     .filter((cells) => cells.some((cell) => /Philippines|0\.395|0\.397/i.test(cell)));
   const text = plainText(html);
   const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
-  const scripts = scriptTags.map((match) => {
+  const scripts = await Promise.all(scriptTags.map(async (match) => {
     const src = match[1].match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
     const inline = match[2];
-    const relevant = /exchange.?rate|currency|philippines|\bPHP\b|\bapi\b|ajax|graphql/i.test(inline);
-    return {
-      src: src ? new URL(src, response.url).href : null,
-      inlineLength: inline.length,
-      relevantInline: !src && relevant ? inline.slice(0, 2000) : undefined,
-    };
-  }).filter((script) => script.src || script.relevantInline);
+    const scriptUrl = src ? new URL(src, response.url).href : null;
+    if (!scriptUrl) {
+      return /exchange.?rate|currency|philippines|\bPHP\b|\bapi\b|ajax|graphql/i.test(inline)
+        ? { src: null, inlineLength: inline.length, relevantInline: inline.slice(0, 2000) }
+        : null;
+    }
+    try {
+      const scriptResponse = await fetch(scriptUrl, {
+        headers: { "User-Agent": "Mozilla/5.0", "Accept": "*/*" },
+        signal: AbortSignal.timeout(12000),
+      });
+      const scriptText = await scriptResponse.text();
+      const matches = [...scriptText.matchAll(/.{0,100}(?:exchange.?rate|currency|philippines|\\bPHP\\b|\\bapi\\b|graphql|fetch\\(|axios).{0,180}/gi)]
+        .slice(0, 15).map((item) => item[0]);
+      return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches };
+    } catch (error) {
+      return { src: scriptUrl, error: error instanceof Error ? error.message : String(error) };
+    }
+  })).then((items) => items.filter(Boolean));
   return {
     fetchedUrl: response.url,
     httpStatus: response.status,
