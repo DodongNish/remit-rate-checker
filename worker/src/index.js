@@ -130,7 +130,7 @@ async function inspectCityExpress() {
         offset: item.index,
         context: scriptText.slice(Math.max(0, item.index - 500), Math.min(scriptText.length, item.index + 1800)),
       }));
-      const urlLiterals = [...new Set(scriptText.match(/https?:\\/\\/[^"' \\t\\n]+/g) ?? [])].slice(0, 40);
+      const urlLiterals = [...new Set(scriptText.match(/https?:\/\/[^"' \t\n]+/g) ?? [])].slice(0, 40);
       return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches, deepInspection, moduleDefinitions, urlLiterals };
     } catch (error) {
       return { src: scriptUrl, error: error instanceof Error ? error.message : String(error) };
