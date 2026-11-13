@@ -92,8 +92,8 @@ async function inspectCityExpress() {
         signal: AbortSignal.timeout(12000),
       });
       const scriptText = await scriptResponse.text();
-      const matches = [...scriptText.matchAll(/.{0,100}(?:exchange.?rate|currency|philippines|\\bPHP\\b|\\bapi\\b|graphql|fetch\\(|axios).{0,180}/gi)]
-        .slice(0, 15).map((item) => item[0]);
+      const matches = [...scriptText.matchAll(/exchange|currency|philippines|PHP|api|graphql|fetch|axios/gi)]
+        .slice(0, 15).map((item) => scriptText.slice(Math.max(0, item.index - 100), Math.min(scriptText.length, item.index + 180)));
       return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches };
     } catch (error) {
       return { src: scriptUrl, error: error instanceof Error ? error.message : String(error) };
