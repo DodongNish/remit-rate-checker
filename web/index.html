@@ -68,6 +68,7 @@
     th { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
     tbody tr:last-child td { border-bottom: 0; }
     tbody tr.best { background: var(--best-bg); }
+    td.updated { white-space: nowrap; }
     td.rate { text-align: right; font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
     td.provider a { color: inherit; text-underline-offset: 3px; }
     .tag { display: inline-block; color: var(--best); font-size: .75rem; font-weight: 650; margin-left: 8px; }
@@ -261,6 +262,7 @@
         rateCell.className = "rate";
         rateCell.textContent = entry.rate.toFixed(6) + " PHP";
         const updatedCell = document.createElement("td");
+        updatedCell.className = "updated";
         updatedCell.textContent = formatUpdatedAt(entry.updatedAt);
         tr.append(providerCell, methodCell, rateCell, updatedCell);
         tbody.appendChild(tr);
