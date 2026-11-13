@@ -109,11 +109,11 @@ async function inspectCityExpress() {
         const index = scriptText.indexOf(term);
         return { term, context: index >= 0 ? scriptText.slice(Math.max(0, index - 1800), Math.min(scriptText.length, index + 2600)) : null };
       }).filter((item) => item.context);
-      const moduleDefinitions = [...scriptText.matchAll(/(?:^|[,\\[])31945\\s*,/g)].slice(0, 5).map((item) => ({
+      const moduleDefinitions = [...scriptText.matchAll(/31945/g)].slice(0, 5).map((item) => ({
         offset: item.index,
         context: scriptText.slice(Math.max(0, item.index - 500), Math.min(scriptText.length, item.index + 1800)),
       }));
-      const urlLiterals = [...new Set(scriptText.match(/https?:\\/\\/[^"'\\s`]+/g) ?? [])].slice(0, 40);
+      const urlLiterals = [...new Set(scriptText.match(/https?:\\/\\/[^"' \\t\\n]+/g) ?? [])].slice(0, 40);
       return { src: scriptUrl, status: scriptResponse.status, length: scriptText.length, matches, deepInspection, moduleDefinitions, urlLiterals };
     } catch (error) {
       return { src: scriptUrl, error: error instanceof Error ? error.message : String(error) };
