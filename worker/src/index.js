@@ -25,21 +25,23 @@ const PROVIDERS = [
   {
     name: "City Express",
     url: "https://www.cityremit.com/en/exchange-rates/#:~:text=PHILIPPINES",
-    parse(html) {
-      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
-      for (const row of rows) {
-        const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
-          .map((cell) => plainText(cell[1]));
-        if (cells.length && /^Philippines$/i.test(cells[0])) {
-          const rate = cells[cells.length - 1].match(/(\d+(?:\.\d+)?)/);
-          if (rate) return [{ method: "App", rate: Number(rate[1]) }];
-        }
+    async fetchRates() {
+      const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
+      const response = await fetch(apiUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+          "Accept": "application/json",
+        },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error(`API HTTP ${response.status}`);
+      const data = await response.json();
+      const rate = Number(data?.rates?.PHP);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new Error("PHP rate not found in API response");
       }
-      const text = plainText(html).replace(/\s+/g, "");
-      const fallback = text.match(/PhilippinesPHP(\d+(?:\.\d+)?)/i);
-      if (fallback) return [{ method: "App", rate: Number(fallback[1]) }];
-      throw new Error("Philippines rate not found");
-    },
+      return [{ method: "App", rate }];
+    },,
   },
 ];
 
@@ -153,6 +155,9 @@ async function inspectCityExpress() {
 
 async function fetchProvider(provider) {
   try {
+    if (provider.fetchRates) {
+      return { name: provider.name, url: provider.url, rates: await provider.fetchRates() };
+    }
     const response = await fetch(provider.url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
