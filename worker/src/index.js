@@ -87,6 +87,23 @@ async function inspectCityExpress() {
   } catch (error) {
     apiProbe = { error: error instanceof Error ? error.message : String(error) };
   }
+  let adminApiProbe;
+  try {
+    const adminApiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
+    const adminApiResponse = await fetch(adminApiUrl, {
+      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const adminApiBody = await adminApiResponse.text();
+    adminApiProbe = {
+      url: adminApiUrl,
+      status: adminApiResponse.status,
+      contentType: adminApiResponse.headers.get("content-type"),
+      body: adminApiBody.slice(0, 20000),
+    };
+  } catch (error) {
+    adminApiProbe = { error: error instanceof Error ? error.message : String(error) };
+  }
   const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
   const scripts = await Promise.all(scriptTags.map(async (match) => {
     const src = match[1].match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
@@ -126,6 +143,7 @@ async function inspectCityExpress() {
     matchingRows: rows,
     scripts,
     apiProbe,
+    adminApiProbe,
     textAroundRates: ["0.395", "0.397"].map((term) => {
       const index = text.indexOf(term);
       return { term, context: index >= 0 ? text.slice(Math.max(0, index - 100), index + 150) : null };
