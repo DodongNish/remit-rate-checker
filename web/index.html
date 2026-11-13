@@ -4,6 +4,11 @@
 <head>
   <meta charset="utf-8">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#0f7a52">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Remit Rates">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JPY to PHP Remittance Rate Comparison</title>
   <style>
@@ -238,6 +243,16 @@
 
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
+    function isIOSDevice() {
+      return /iPhone|iPad|iPod/.test(navigator.userAgent)
+        || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    }
+
+    function isStandaloneApp() {
+      return window.matchMedia("(display-mode: standalone)").matches
+        || window.navigator.standalone === true;
+    }
+
     function urlBase64ToUint8Array(base64String) {
       const padding = "=".repeat((4 - base64String.length % 4) % 4);
       const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -248,14 +263,19 @@
     async function updateNotificationStatus() {
       const button = $("notification-button");
       const status = $("notification-status");
+      if (isIOSDevice() && !isStandaloneApp()) {
+        button.disabled = true;
+        status.textContent = "On iPhone, add this site to the Home Screen and open it from its icon to enable notifications.";
+        return;
+      }
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
         button.disabled = true;
-        status.textContent = "Push notifications are not supported by this browser.";
+        status.textContent = "Push notifications are not supported in this browsing mode.";
         return;
       }
       if (Notification.permission === "denied") {
         button.disabled = true;
-        status.textContent = "Notifications are blocked in your browser settings.";
+        status.textContent = "Notifications are blocked in your device settings.";
         return;
       }
       try {
@@ -392,8 +412,8 @@
         date = new Date(text);
       } else {
         // Provider timestamps without a timezone are treated as Japan time.
-        const numericMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?/);
-        const englishMatch = text.match(/^(\d{4})\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2}):(\d{2})/i);
+        const numericMatch = text.match(/^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})[ T,]+(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+        const englishMatch = text.match(/^(\\d{4})\\s+([A-Za-z]+)\\s+(\\d{1,2}),?\\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\\s+(\\d{1,2}):(\\d{2})/i);
         if (numericMatch) {
           const [, year, month, day, hour, minute] = numericMatch;
           date = new Date(Date.UTC(
