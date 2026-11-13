@@ -155,54 +155,77 @@ async function inspectCityExpress() {
 
 
 async function inspectSBI() {
-  const urls = [
-    "https://www.remit.co.jp/en/kaigaisoukin/exchangeratecommission/exchange/",
-    "https://ires.remit.co.jp/IRESWeb/Exchange_Rate.jsf",
-    "https://ires.remit.co.jp/IRESWeb/ExchangeDirect.jsf",
-  ];
-  const results = [];
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
-          "Accept": "text/html,application/xhtml+xml",
-          "Accept-Language": "en,ja;q=0.8",
-        },
-        redirect: "follow",
-        signal: AbortSignal.timeout(15000),
-      });
-      const html = await response.text();
-      const links = [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)]
-        .map((m) => ({ attrs: m[1].slice(0, 500), text: plainText(m[2]).slice(0, 180) }))
-        .filter((x) => /exchange|rate|ires|philipp|php/i.test(x.attrs + " " + x.text))
-        .slice(0, 40);
-      const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)]
-        .map((m) => ({
-          attrs: m[1].slice(0, 1000),
-          fields: [...m[2].matchAll(/<(input|select|button|textarea)\b([^>]*)>/gi)]
-            .map((f) => f[1] + " " + f[2].slice(0, 500)).slice(0, 80),
-        }));
-      results.push({
-        requestedUrl: url,
-        finalUrl: response.url,
-        status: response.status,
-        contentType: response.headers.get("content-type"),
-        setCookie: response.headers.get("set-cookie"),
-        htmlLength: html.length,
-        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
-        links,
-        forms,
-        bodyStart: html.slice(0, 14000),
-      });
-    } catch (error) {
-      results.push({ requestedUrl: url, error: error instanceof Error ? error.message : String(error) });
-    }
+  const url = "https://ires.remit.co.jp/IRESWeb/ExchangeDirect.jsf";
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+  };
+  const initial = await fetch(url, {
+    headers,
+    redirect: "manual",
+    signal: AbortSignal.timeout(15000),
+  });
+  const initialHtml = await initial.text();
+  const setCookie = initial.headers.get("set-cookie") || "";
+  const cookies = [...setCookie.matchAll(/(?:^|,\s*)([^=;,\s]+)=([^;,\s]+)/g)]
+    .map((m) => m[1] + "=" + m[2]);
+  const cookie = cookies.join("; ");
+  const token = initialHtml.match(/name="uniqueToken"\s+value="([^"]+)"/i)?.[1];
+  const viewState = initialHtml.match(/name="javax\.faces\.ViewState"\s+id="[^"]+"\s+value="([^"]+)"/i)?.[1];
+  const formData = new URLSearchParams();
+  formData.set("dummyForm", "dummyForm");
+  if (token) formData.set("uniqueToken", token);
+  formData.set("mulClickToken", "");
+  formData.set("dummyForm:doInit", "");
+  if (viewState) formData.set("javax.faces.ViewState", viewState);
+
+  let postResult = null;
+  if (token && viewState && cookie) {
+    const posted = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookie,
+        "Origin": "https://ires.remit.co.jp",
+        "Referer": url,
+      },
+      body: formData.toString(),
+      redirect: "manual",
+      signal: AbortSignal.timeout(20000),
+    });
+    const html = await posted.text();
+    postResult = {
+      status: posted.status,
+      location: posted.headers.get("location"),
+      setCookie: posted.headers.get("set-cookie"),
+      htmlLength: html.length,
+      title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? null,
+      tables: [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)]
+        .map((m) => plainText(m[1]).slice(0, 5000)),
+      rows: [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+        .map((m) => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => plainText(c[1])))
+        .filter((cells) => cells.length),
+      textPreview: plainText(html).slice(0, 10000),
+      bodyStart: html.slice(0, 16000),
+    };
   }
-  return { results };
+
+  return {
+    initial: {
+      status: initial.status,
+      finalUrl: initial.url,
+      setCookie,
+      cookie,
+      htmlLength: initialHtml.length,
+      tokenFound: Boolean(token),
+      viewStateFound: Boolean(viewState),
+      bodyStart: initialHtml.slice(0, 5000),
+    },
+    postResult,
+  };
 }
-
-
 async function fetchProvider(provider) {
   try {
     if (provider.fetchRates) {
