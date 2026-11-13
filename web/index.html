@@ -229,7 +229,7 @@
     <footer>
       <p>Rates are indicative and may change. The applicable rate is determined when the transfer is processed.</p>
       <p>Rates are sorted from highest to lowest. The best available rate is highlighted.</p>
-      <p>You can enable browser notifications to be alerted when the ranking changes.</p>
+      <p>Enable background push notifications to be alerted when the ranking changes, even when this page is closed.</p>
     </footer>
   </main>
 
@@ -259,7 +259,7 @@
         return;
       }
       try {
-        const registration = await navigator.serviceWorker.getRegistration("./");
+        const registration = await navigator.serviceWorker.getRegistration();
         const subscription = registration ? await registration.pushManager.getSubscription() : null;
         button.textContent = subscription ? "Disable ranking notifications" : "Enable ranking notifications";
         status.textContent = subscription
@@ -334,9 +334,6 @@
       const successful = entries.filter((entry) => !entry.error).sort((a, b) => b.rate - a.rate);
       const failed = entries.filter((entry) => entry.error);
       const bestRate = successful.length ? successful[0].rate : null;
-      const ranking = successful.map((entry) => entry.provider.name + "::" + entry.method);
-      const providersComplete = (data.providers || []).length > 0 && (data.providers || []).every((provider) => !provider.error);
-      checkRankingChange(ranking, providersComplete);
       for (const [index, entry] of successful.entries()) {
         const tr = document.createElement("tr");
         if (index === 0) tr.classList.add("best");
@@ -454,9 +451,6 @@
 
     updateCurrentTime();
     setInterval(updateCurrentTime, 1000);
-
-    // Cloudflare Worker API endpoint.
-    const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
     let isLoading = false;
     let hasLoadedRates = false;
