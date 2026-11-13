@@ -287,7 +287,7 @@
         previousCell.textContent = Number.isFinite(entry.previousRate) ? entry.previousRate.toFixed(6) : "—";
         const currentCell = document.createElement("td");
         currentCell.className = "current-rate";
-        currentCell.textContent = entry.rate.toFixed(6);
+        currentCell.textContent = entry.rate.toFixed(6) + " PHP";
         const updatedCell = document.createElement("td");
         updatedCell.className = "updated";
         updatedCell.textContent = formatUpdatedAt(entry.updatedAt);
@@ -305,7 +305,7 @@
       }
       if (Object.keys(currentRates).length) {
         try {
-          localStorage.setItem(PREVIOUS_RATES_KEY, JSON.stringify(currentRates));
+          localStorage.setItem(PREVIOUS_RATES_KEY, JSON.stringify({ ...previousRates, ...currentRates }));
         } catch {
           // The comparison still works for the current page session.
         }
