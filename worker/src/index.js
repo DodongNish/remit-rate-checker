@@ -69,7 +69,7 @@ async function inspectCityExpress() {
     },
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const html = await response.text();
   const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
     .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
