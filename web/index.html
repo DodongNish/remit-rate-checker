@@ -203,7 +203,8 @@
 <body>
   <main>
     <h1>JPY to PHP Remittance Rates</h1>
-    <p class="sub" id="current-time">Loading rates…</p>
+    <p class="sub" id="updated">Loading rates…</p>
+    <p class="sub" id="current-time">Current time: --</p>
 
     <div class="table-wrap">
       <table aria-live="polite">
@@ -334,7 +335,7 @@
         hasLoadedRates = true;
       } catch (error) {
         $("updated").textContent = hasLoadedRates
-          ? "Refresh failed. Showing the last successfully loaded rates. Auto-refresh: every 1 minute."
+          ? "Refresh failed. Showing the last successfully loaded rates."
           : "Unable to load exchange rates. Retrying in 1 minute.";
       } finally {
         isLoading = false;
