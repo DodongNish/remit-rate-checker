@@ -291,14 +291,39 @@
     // Cloudflare Worker API endpoint.
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
-    fetch(`${API_URL}/api/rates`, { cache: "no-store" })
-      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((j) => {
-        const d = new Date(j.updated);
-        $("updated").textContent = "Last updated: " + d.toLocaleString("en-GB", { timeZone: "Asia/Tokyo", dateStyle: "medium", timeStyle: "short" }) + " (JST)";
-        render(j);
-      })
-      .catch(() => { $("updated").textContent = "Unable to load exchange rates. Please try refreshing the page."; });
+    let isLoading = false;
+    let hasLoadedRates = false;
+
+    async function loadRates() {
+      if (isLoading) return;
+      isLoading = true;
+      try {
+        const response = await fetch(`${API_URL}/api/rates`, { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
+        const updated = new Date(data.updated);
+        $("updated").textContent =
+          "Last updated: " +
+          updated.toLocaleString("en-GB", {
+            timeZone: "Asia/Tokyo",
+            dateStyle: "medium",
+            timeStyle: "short",
+          }) +
+          " (JST) · Auto-refresh: every 1 minute";
+        render(data);
+        hasLoadedRates = true;
+      } catch (error) {
+        $("updated").textContent = hasLoadedRates
+          ? "Refresh failed. Showing the last successfully loaded rates. Auto-refresh: every 1 minute."
+          : "Unable to load exchange rates. Retrying in 1 minute.";
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    // Load immediately, then refresh rates every 60 seconds without reloading the page.
+    loadRates();
+    setInterval(loadRates, 60 * 1000);
   </script>
 </body>
 
