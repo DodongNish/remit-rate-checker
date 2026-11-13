@@ -50,6 +50,15 @@
   li.error { grid-template-columns: 1fr; color: var(--err); }
   footer { margin-top: 24px; color: var(--muted); font-size: .8rem; }
   footer p { margin: 4px 0; }
+
+  li.error .name a {
+  color: inherit;
+  text-underline-offset: 3px;
+  }
+
+  li.error .method {
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -108,12 +117,23 @@ function render() {
     list.appendChild(li);
   });
 
-  failed.forEach((x) => {
-    const li = document.createElement("li");
-    li.className = "error";
-    li.textContent = `${x.p.name}: 今回は取得できませんでした`;
-    list.appendChild(li);
-  });
+
+failed.forEach((x) => {
+  const li = document.createElement("li");
+  li.className = "error";
+
+  li.innerHTML = `
+    <span class="name">
+      <a href="${x.p.url}" target="_blank" rel="noopener">
+        ${x.p.name}
+      </a>
+    </span>
+    <span class="method">レート取得失敗</span>
+  `;
+
+  list.appendChild(li);
+});
+
 }
 
 fetch("rates.json", { cache: "no-store" })
