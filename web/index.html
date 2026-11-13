@@ -249,7 +249,7 @@
     }
 
     // Cloudflare Worker のデプロイ後、下記を実際の workers.dev URL に置き換えてください。
-    const API_URL = "https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev";
+    const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
 
     fetch(`${API_URL}/api/rates`, { cache: "no-store" })
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
