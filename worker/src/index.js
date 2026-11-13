@@ -70,6 +70,7 @@ const PROVIDERS = [
       const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
         .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1])));
+      const updatedAt = plainText(html).match(/(\\d{4}\\/\\d{2}\\/\\d{2}\\s+\\d{2}:\\d{2})\\s*現在?/)?.[1] ?? null;
       const rates = rows
         .filter((cells) => cells.length >= 4 && cells[0] === "Philippines")
         .map((cells) => {
@@ -78,7 +79,7 @@ const PROVIDERS = [
         })
         .filter((item) => item && Number.isFinite(item.rate) && item.rate > 0);
       if (!rates.length) throw new Error("SBI PHP rates not found");
-      return rates;
+      return { rates, updatedAt };
     },
   },
   {
@@ -99,7 +100,10 @@ const PROVIDERS = [
       if (!Number.isFinite(rate) || rate <= 0) {
         throw new Error("PHP rate not found in API response");
       }
-      return [{ method: "App", rate }];
+      return {
+        rates: [{ method: "App", rate }],
+        updatedAt: data?.asOf ?? null,
+      };
     },
   },
 ];
@@ -266,7 +270,13 @@ async function inspectSBI() {
 async function fetchProvider(provider) {
   try {
     if (provider.fetchRates) {
-      return { name: provider.name, url: provider.url, rates: await provider.fetchRates() };
+      const result = await provider.fetchRates();
+      return {
+        name: provider.name,
+        url: provider.url,
+        rates: Array.isArray(result) ? result : result.rates,
+        updatedAt: Array.isArray(result) ? null : result.updatedAt ?? null,
+      };
     }
     const response = await fetch(provider.url, {
       headers: {
@@ -278,7 +288,12 @@ async function fetchProvider(provider) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
-    return { name: provider.name, url: provider.url, rates: provider.parse(html) };
+    return {
+      name: provider.name,
+      url: provider.url,
+      rates: provider.parse(html),
+      updatedAt: provider.getUpdatedAt?.(html) ?? null,
+    };
   } catch (error) {
     return {
       name: provider.name,
