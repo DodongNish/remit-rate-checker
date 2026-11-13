@@ -10,7 +10,7 @@ import datetime as dt
 import requests
 from bs4 import BeautifulSoup
 
-UA = "Mozilla/5.0 (compatible; remit-rate-page/1.0; +https://github.com/YOUR_NAME/YOUR_REPO)"
+UA = "Mozilla/5.0 (compatible; remit-rate-page/1.0; +https://github.com/DodongNish/remit-rate-checker)"
 TIMEOUT = 20
 
 URLS = {
@@ -40,82 +40,18 @@ def to_rate(text):
     return float(m.group(1))
 
 
-# def fetch_sbi():
-#     # JSESSIONID が発行されるので Session を使う
-#     with requests.Session() as s:
-#         soup = get_soup(URLS["SBI Remit"], s)
-#     rows = []
-#     for tr in soup.find_all("tr"):
-#         tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
-#         if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
-#             rows.append({"method": tds[3], "rate": to_rate(tds[2])})
-#     if not rows:
-#         raise ValueError("Philippines の行が見つからない")
-#     return rows
-
-BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
-
-
-def _sbi_rows(soup):
+def fetch_sbi():
+    # JSESSIONID が発行されるので Session を使う
+    with requests.Session() as s:
+        soup = get_soup(URLS["SBI Remit"], s)
     rows = []
     for tr in soup.find_all("tr"):
         tds = [squash(td.get_text(" ")) for td in tr.find_all("td")]
-        if len(tds) >= 4 and tds[0] in ("Philippines", "フィリピン") and "PHP" in tds[2]:
+        if len(tds) >= 4 and tds[0] == "Philippines" and "PHP" in tds[2]:
             rows.append({"method": tds[3], "rate": to_rate(tds[2])})
+    if not rows:
+        raise ValueError("Philippines の行が見つからない")
     return rows
-
-
-def fetch_sbi():
-    url = URLS["SBI Remit"]
-
-    # 1) Chrome と同じヘッダー(requests)
-    try:
-        with requests.Session() as s:
-            s.headers.update({
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Encoding": "gzip, deflate",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
-                "Sec-Ch-Ua": '"Not-A.Brand";v="99", "Google Chrome";v="157", "Chromium";v="157"',
-                "Sec-Ch-Ua-Mobile": "?0",
-                "Sec-Ch-Ua-Platform": '"Windows"',
-                "Sec-Fetch-Dest": "document",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "none",
-                "Sec-Fetch-User": "?1",
-                "Upgrade-Insecure-Requests": "1",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
-            })
-            r = s.get(url, timeout=TIMEOUT)
-            r.encoding = "utf-8"
-            rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
-            print(f"[DEBUG] SBI chrome-headers: status={r.status_code} rows={len(rows)} "
-                  f"len={len(r.text)}", file=sys.stderr)
-            if rows:
-                return rows
-    except Exception as e:
-        print(f"[DEBUG] SBI chrome-headers: {type(e).__name__}: {e}", file=sys.stderr)
-
-    # 2) Chrome の TLS / HTTP2 の特徴を再現(curl_cffi)
-    try:
-        import subprocess
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "curl_cffi"], check=True)
-        from curl_cffi import requests as cr
-        r = cr.get(url, impersonate="chrome", timeout=TIMEOUT,
-                   headers={"Accept-Language": "en-US,en;q=0.9"})
-        r.encoding = "utf-8"
-        rows = _sbi_rows(BeautifulSoup(r.text, "html.parser"))
-        print(f"[DEBUG] SBI curl_cffi: status={r.status_code} rows={len(rows)} "
-              f"len={len(r.text)}", file=sys.stderr)
-        if rows:
-            return rows
-    except Exception as e:
-        print(f"[DEBUG] SBI curl_cffi: {type(e).__name__}: {e}", file=sys.stderr)
-
-    raise ValueError("Philippines の行が見つからない")
 
 
 def fetch_smiles():
