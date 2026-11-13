@@ -53,6 +53,10 @@ def to_rate(text):
 #         raise ValueError("Philippines の行が見つからない")
 #     return rows
 
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
+
+
 def _sbi_rows(soup):
     rows = []
     for tr in soup.find_all("tr"):
@@ -63,42 +67,28 @@ def _sbi_rows(soup):
 
 
 def fetch_sbi():
-    from urllib.parse import urljoin
     url = URLS["SBI Remit"]
     with requests.Session() as s:
-        soup = get_soup(url, s)
-        rows = _sbi_rows(soup)
-        if rows:
-            return rows
-
-        # 試行1: フォームをそのまま POST する
-        form = soup.find("form")
-        data = {i["name"]: i.get("value", "") for i in form.find_all("input") if i.get("name")}
-        r = s.post(urljoin(url, form["action"]), data=data,
-                   headers={"User-Agent": UA, "Referer": url}, timeout=TIMEOUT)
+        s.headers.update({
+            "User-Agent": BROWSER_UA,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ja,en;q=0.8",
+            "Referer": "https://www.remit.co.jp/",
+        })
+        r = s.get(url, timeout=TIMEOUT)
         r.encoding = r.apparent_encoding
-        soup2 = BeautifulSoup(r.text, "html.parser")
-        rows = _sbi_rows(soup2)
-        print(f"[DEBUG] SBI POST: status={r.status_code} rows={len(rows)} "
-              f"text_len={len(squash(soup2.get_text(' ')))} "
-              f"has_PH={'Philippines' in r.text or 'フィリピン' in r.text}", file=sys.stderr)
+        soup = BeautifulSoup(r.text, "html.parser")
+        rows = _sbi_rows(soup)
+        print(f"[DEBUG] SBI browser-UA: status={r.status_code} final_url={r.url} "
+              f"len={len(r.text)} rows={len(rows)} cookies={list(s.cookies.keys())} "
+              f"server={r.headers.get('Server')}", file=sys.stderr)
+        try:
+            ip = requests.get("https://ipinfo.io/json", timeout=10).json()
+            print(f"[DEBUG] runner: country={ip.get('country')} org={ip.get('org')}", file=sys.stderr)
+        except Exception as e:
+            print(f"[DEBUG] runner ip lookup failed: {e}", file=sys.stderr)
         if rows:
             return rows
-
-        # 診断: JS の通信まわりを抜き出す
-        for name in ("main.js", "form.js"):
-            try:
-                js = s.get(urljoin(url, "js/" + name), headers={"User-Agent": UA}, timeout=TIMEOUT).text
-            except Exception as e:
-                print(f"[DEBUG] SBI {name}: {e}", file=sys.stderr)
-                continue
-            print(f"[DEBUG] SBI {name}: len={len(js)}", file=sys.stderr)
-            n = 0
-            for m in re.finditer(r"ajax|\$\.post|\$\.get|XMLHttpRequest|fetch\(|Exchange|rate|\.jsf|submit\(", js, re.I):
-                print(f"[DEBUG] SBI {name}@{m.start()}: {squash(js[max(0, m.start()-120):m.start()+260])!r}", file=sys.stderr)
-                n += 1
-                if n >= 8:
-                    break
     raise ValueError("Philippines の行が見つからない")
 
 
