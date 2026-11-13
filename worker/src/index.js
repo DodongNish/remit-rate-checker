@@ -10,7 +10,7 @@ const PROVIDERS = [
       for (const match of anchors) {
         const text = plainText(match[1]);
         const rate = text.match(/^(\d+(?:\.\d+)?)\s*PHP$/i);
-        if (rate) return [{ method: "App", rate: Number(rate[1]) }];
+        if (rate) return [{ method: "Published rate", rate: Number(rate[1]) }];
       }
       throw new Error("PHP rate not found");
     },
@@ -107,7 +107,7 @@ const PROVIDERS = [
         throw new Error("PHP rate not found in API response");
       }
       return {
-        rates: [{ method: "App", rate }],
+        rates: [{ method: "Published rate", rate }],
         updatedAt: data?.asOf ?? null,
       };
     },
