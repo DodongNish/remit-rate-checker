@@ -76,11 +76,11 @@ async function inspectCityExpress() {
       .map((cell) => plainText(cell[1])))
     .filter((cells) => cells.some((cell) => /Philippines|0\.395|0\.397/i.test(cell)));
   const text = plainText(html);
-  const scriptTags = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
   const scripts = scriptTags.map((match) => {
-    const src = match[1].match(/\\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
+    const src = match[1].match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? null;
     const inline = match[2];
-    const relevant = /exchange.?rate|currency|philippines|\\bPHP\\b|\\bapi\\b|ajax|graphql/i.test(inline);
+    const relevant = /exchange.?rate|currency|philippines|\bPHP\b|\bapi\b|ajax|graphql/i.test(inline);
     return {
       src: src ? new URL(src, response.url).href : null,
       inlineLength: inline.length,
