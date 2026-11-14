@@ -84,7 +84,13 @@ const PROVIDERS = [
         .filter((cells) => cells.length >= 4 && cells[0] === "Philippines")
         .map((cells) => {
           const rate = cells[2].match(/([0-9]+(?:\.[0-9]+)?)\s*PHP/i);
-          return rate ? { method: cells[3].replace(/\s+/g, " ").trim(), rate: Number(rate[1]) } : null;
+          const rawMethod = cells[3].replace(/\s+/g, " ").trim();
+          const method = /BANK DIRECT BD-TRG-I/i.test(rawMethod)
+            ? "Bank Deposit"
+            : /GCASH/i.test(rawMethod)
+              ? "Wallet (Gcash)"
+              : rawMethod;
+          return rate ? { method, rate: Number(rate[1]) } : null;
         })
         .filter((item) => item && Number.isFinite(item.rate) && item.rate > 0);
       if (!rates.length) throw new Error("SBI PHP rates not found");
