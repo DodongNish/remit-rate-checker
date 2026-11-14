@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "JPY to PHP Remittance Rates",
-  "short_name": "Remit Rates",
-  "description": "Compare JPY to PHP remittance exchange rates.",
+  "name": "Remittance Rates",
+  "short_name": "Remittance Rates",
+  "description": "Compare remittance exchange rates.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
