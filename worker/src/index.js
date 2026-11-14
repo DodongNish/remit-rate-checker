@@ -415,6 +415,8 @@ async function sendRankingNotifications(env, ranking) {
           await env.PUSH_KV.delete(name);
         } else if (!response.ok) {
           console.error("Push delivery failed:", response.status, name);
+        } else {
+          console.info("Push delivered:", response.status, new URL(subscription.endpoint).hostname);
         }
       } catch (error) {
         console.error("Push delivery error:", name, error);
