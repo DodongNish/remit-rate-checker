@@ -22,6 +22,8 @@
       --bar: #b9d3de;
       --best: #0f7a52;
       --best-bg: #e3f3ec;
+      --city-accent: #0ea5e9;
+      --city-bg: #effaff;
       --err: #a33a2c;
     }
 
@@ -35,6 +37,8 @@
         --bar: #2c4b59;
         --best: #4fcf96;
         --best-bg: #17332a;
+        --city-accent: #38bdf8;
+        --city-bg: #12303b;
         --err: #f08b7c;
       }
     }
@@ -86,7 +90,7 @@
     th { color: var(--muted); font-size: .8rem; font-weight: 600; white-space: nowrap; }
     tbody tr:last-child td { border-bottom: 0; }
     tbody tr.best { background: var(--best-bg); }
-    tbody tr.city-express { box-shadow: inset 3px 0 0 var(--bar); font-weight: 650; }
+    tbody tr.city-express { background: var(--city-bg); box-shadow: inset 4px 0 0 var(--city-accent); font-weight: 650; }
     tbody tr.city-express td:first-child { font-weight: 750; }
     td.updated { white-space: nowrap; }
     td.rate { text-align: right; font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
