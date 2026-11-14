@@ -390,16 +390,16 @@ async function removeSubscription(request, env, corsHeaders) {
   return jsonResponse({ ok: true }, 200, corsHeaders);
 }
 
-async function sendRateChangeNotifications(env, providers) {
-  const topEntries = getRanking(providers)
-    .slice(0, 3)
-    .map((id, index) => {
-      const [provider, method] = id.split("::");
-      return (index + 1) + ". " + provider + " — " + method;
-    });
+async function sendRateChangeNotifications(env, changedProviders) {
+  const lines = changedProviders.slice(0, 3).map(({ name, rates }) => {
+    const details = rates.map(({ method, rate }) =>
+      method ? method + ": " + rate.toFixed(6) : rate.toFixed(6) + " PHP"
+    ).join(", ");
+    return name + ": " + details;
+  });
   const payloadData = JSON.stringify({
     title: "Exchange rates updated",
-    body: "Another provider's exchange rate has changed.\\n" + topEntries.join("\\n"),
+    body: lines.join("\n"),
     url: "https://dodongnish.github.io/remit-rate-checker/",
   });
   const vapid = {
@@ -486,10 +486,21 @@ async function checkRankingAndNotify(env) {
   const comparableKeys = Object.keys(currentRates).filter((key) =>
     Object.prototype.hasOwnProperty.call(previousRates, key)
   );
-  const changed = comparableKeys.some((key) => currentRates[key] !== Number(previousRates[key]));
+  const changedKeys = comparableKeys.filter((key) =>
+    currentRates[key] !== Number(previousRates[key])
+  );
+  const changedByProvider = new Map();
+  for (const key of changedKeys) {
+    const separator = key.indexOf("::");
+    const name = separator >= 0 ? key.slice(0, separator) : key;
+    const method = separator >= 0 ? key.slice(separator + 2) : "";
+    if (!changedByProvider.has(name)) changedByProvider.set(name, []);
+    changedByProvider.get(name).push({ method, rate: currentRates[key] });
+  }
+  const changedProviders = [...changedByProvider].map(([name, rates]) => ({ name, rates }));
 
-  if (changed) {
-    await sendRateChangeNotifications(env, providers);
+  if (changedProviders.length) {
+    await sendRateChangeNotifications(env, changedProviders);
   }
 
   await env.PUSH_KV.put(storageKey, JSON.stringify(currentRates));
