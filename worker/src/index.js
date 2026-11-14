@@ -92,7 +92,7 @@ const PROVIDERS = [
     },
   },
   {
-    name: "JP Remit",
+    name: "JRF",
     url: "https://www.jpremit.com/today-rates#:~:text=Philippines",
     parse(html) {
       const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
