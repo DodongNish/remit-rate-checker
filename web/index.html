@@ -429,7 +429,7 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.className = "provider-name";
-        link.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "10 Minutes");
+        link.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "Cash Pickup");
         providerCell.appendChild(link);
         const providerMethod = document.createElement("div");
         providerMethod.className = "provider-method";
@@ -461,7 +461,7 @@
         tr.className = "error";
         const cell = document.createElement("td");
         cell.colSpan = 4
-        cell.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "10 Minutes") + ": Unable to retrieve rates (" + entry.error + ")";
+        cell.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "Cash Pickup") + ": Unable to retrieve rates (" + entry.error + ")";
         tr.appendChild(cell);
         tbody.appendChild(tr);
       }
