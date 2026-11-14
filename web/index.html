@@ -456,7 +456,9 @@
         const providerCell = document.createElement("td");
         providerCell.className = "provider";
         const link = document.createElement("a");
-        link.href = entry.provider.url;
+        link.href = entry.provider.name === "City Express"
+          ? "https://ctxpress.co.jp/en/exchange-rates/#:~:text=PHILIPPINES"
+          : entry.provider.url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.className = "provider-name";
