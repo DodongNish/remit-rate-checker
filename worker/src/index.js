@@ -95,15 +95,28 @@ const PROVIDERS = [
     name: "JRF",
     url: "https://www.jpremit.com/today-rates#:~:text=Philippines",
     parse(html) {
+      // Preserve flag image alt text: the country label is rendered as an image.
+      const htmlWithImageLabels = html.replace(/<img\b[^>]*\balt=(["'])(.*?)\1[^>]*>/gi, " $2 ");
+      const text = plainText(htmlWithImageLabels);
+      const match = text.match(/Philippines\s+PHP\s*-\s*Philippines\s*(\d+(?:\.\d+)?)/i);
+      const rate = Number(match?.[1]);
+      if (Number.isFinite(rate) && rate > 0) {
+        return [{ method: "Published rate", rate }];
+      }
+
+      // Fallback for table markup with the label and rate in separate cells.
       const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
       for (const row of rows) {
         if (!/philippines/i.test(row[1]) || !/\bPHP\b/i.test(row[1])) continue;
         const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
-          .map((cell) => plainText(cell[1]));
+          .map((cell) => {
+            const withAlt = cell[1].replace(/<img\b[^>]*\balt=(["'])(.*?)\1[^>]*>/gi, " $2 ");
+            return plainText(withAlt);
+          });
         const rateText = [...cells].reverse().find((cell) => /^\d+(?:\.\d+)?$/.test(cell));
-        const rate = Number(rateText);
-        if (Number.isFinite(rate) && rate > 0) {
-          return [{ method: "Published rate", rate }];
+        const rowRate = Number(rateText);
+        if (Number.isFinite(rowRate) && rowRate > 0) {
+          return [{ method: "Published rate", rate: rowRate }];
         }
       }
       throw new Error("Philippines PHP rate not found");
