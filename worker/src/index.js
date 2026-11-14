@@ -411,8 +411,8 @@ async function sendTestNotification(request, env, corsHeaders) {
   }
 
   const payloadData = JSON.stringify({
-    title: "Test notification",
-    body: "Push notifications are working correctly.",
+    title: "Remit Rates",
+    body: "Push notification was enabled.\nYou'll be notified when rates change.",
     url: "https://dodongnish.github.io/remit-rate-checker/",
   });
   const vapid = {
