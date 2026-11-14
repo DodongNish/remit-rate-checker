@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="Remit Rates">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JPY to PHP Remittance Rate Comparison</title>
+  <title>Remittance Rates</title>
   <style>
     :root {
       --bg: #f2f5f7;
@@ -56,9 +56,17 @@
       padding: 32px 16px 56px;
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
     h1 {
       font-size: 1.5rem;
-      margin: 0 0 4px;
+      margin: 0;
     }
 
     .sub {
@@ -69,8 +77,7 @@
     }
 
     #current-time { margin-bottom: 12px; }
-    .notification-controls { margin: 0 0 24px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .notification-status { color:var(--muted); font-size:.8rem; }
+    .notification-controls { display:flex; align-items:center; flex:0 0 auto; }
     #notification-button { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:10px; }
     .notification-icon { display:block; width:22px; height:22px; fill:currentColor; }
 
@@ -220,13 +227,14 @@
 
 <body>
   <main>
-    <h1>JPY to PHP Remittance Rates</h1>
+    <div class="title-row">
+      <h1>Remittance Rates</h1>
+      <div class="notification-controls">
+        <button class="btn" id="notification-button" type="button" aria-label="Enable ranking notifications" title="Enable ranking notifications"><svg class="notification-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm8-4-1.7-2.1A2 2 0 0 1 17.8 14v-3a5.8 5.8 0 0 0-4.8-5.7V4a1 1 0 0 0-2 0v1.3A5.8 5.8 0 0 0 6.2 11v3a2 2 0 0 1-.5 1.9L4 18v1h16v-1Z"/><path d="M3 7a9.5 9.5 0 0 1 3-4l1.2 1.6A7.5 7.5 0 0 0 5 7.7L3 7Zm18 0-2 .7a7.5 7.5 0 0 0-2.2-3.1L18 3a9.5 9.5 0 0 1 3 4Z"/></svg></button>
+      </div>
+    </div>
     <p class="sub" id="updated">Loading rates…</p>
     <p class="sub" id="current-time">Current time: --</p>
-    <div class="notification-controls">
-      <button class="btn" id="notification-button" type="button" aria-label="Enable ranking notifications" title="Enable ranking notifications"><svg class="notification-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm8-4-1.7-2.1A2 2 0 0 1 17.8 14v-3a5.8 5.8 0 0 0-4.8-5.7V4a1 1 0 0 0-2 0v1.3A5.8 5.8 0 0 0 6.2 11v3a2 2 0 0 1-.5 1.9L4 18v1h16v-1Z"/><path d="M3 7a9.5 9.5 0 0 1 3-4l1.2 1.6A7.5 7.5 0 0 0 5 7.7L3 7Zm18 0-2 .7a7.5 7.5 0 0 0-2.2-3.1L18 3a9.5 9.5 0 0 1 3 4Z"/></svg></button>
-      <span class="notification-status" id="notification-status" aria-live="polite"></span>
-    </div>
     <div class="table-wrap">
       <table aria-live="polite">
         <thead><tr><th scope="col">Provider</th><th scope="col">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th><th scope="col">Rate updated</th></tr></thead>
@@ -237,7 +245,6 @@
     <footer>
       <p>Rates are indicative and may change. The applicable rate is determined when the transfer is processed.</p>
       <p>Rates are sorted from highest to lowest. The best available rate is highlighted.</p>
-      <p>Enable background push notifications to be alerted when the ranking changes, even when this page is closed.</p>
     </footer>
   </main>
 
@@ -275,40 +282,40 @@
 
     async function updateNotificationStatus() {
       const button = $("notification-button");
-      const status = $("notification-status");
       if (isIOSDevice() && !isStandaloneApp()) {
         button.disabled = true;
         setNotificationButton(false);
-        status.textContent = "On iPhone, add this site to the Home Screen and open it from its icon to enable notifications.";
+        button.title = "Add this site to the Home Screen to enable notifications";
+        button.setAttribute("aria-label", button.title);
         return;
       }
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
         button.disabled = true;
         setNotificationButton(false);
-        status.textContent = "Push notifications are not supported in this browsing mode.";
+        button.title = "Push notifications are not supported in this browsing mode";
+        button.setAttribute("aria-label", button.title);
         return;
       }
       if (Notification.permission === "denied") {
         button.disabled = true;
         setNotificationButton(false);
-        status.textContent = "Notifications are blocked in your device settings.";
+        button.title = "Notifications are blocked in your device settings";
+        button.setAttribute("aria-label", button.title);
         return;
       }
       try {
         const registration = await navigator.serviceWorker.getRegistration();
         const subscription = registration ? await registration.pushManager.getSubscription() : null;
         setNotificationButton(Boolean(subscription));
-        status.textContent = subscription
-          ? "Background ranking notifications are enabled on this device."
-          : "Get notified even when this page is closed.";
+        if (subscription) button.title = "Disable ranking notifications";
       } catch {
-        status.textContent = "Unable to check notification settings.";
+        button.title = "Unable to check notification settings";
+        button.setAttribute("aria-label", button.title);
       }
     }
 
     $("notification-button").addEventListener("click", async () => {
       const button = $("notification-button");
-      const status = $("notification-status");
       button.disabled = true;
       try {
         let registration = await navigator.serviceWorker.getRegistration("./");
@@ -323,7 +330,7 @@
             body: JSON.stringify({ endpoint: subscription.endpoint }),
           });
           await subscription.unsubscribe();
-          status.textContent = "Ranking notifications disabled.";
+
         } else {
           if (Notification.permission !== "granted") {
             const permission = await Notification.requestPermission();
@@ -342,7 +349,7 @@
             body: JSON.stringify(subscription),
           });
           if (!saveResponse.ok) throw new Error("Unable to save this device's subscription.");
-          status.textContent = "Background ranking notifications enabled.";
+
           try {
             const testResponse = await fetch(API_URL + "/api/push/test", {
               method: "POST",
@@ -358,7 +365,8 @@
           }
         }
       } catch (error) {
-        status.textContent = error instanceof Error ? error.message : "Unable to update notification settings.";
+        button.title = error instanceof Error ? error.message : "Unable to update notification settings";
+        button.setAttribute("aria-label", button.title);
       } finally {
         button.disabled = false;
         await updateNotificationStatus();
