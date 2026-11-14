@@ -8,8 +8,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Remittance ranking changed";
   const options = {
     body: payload.body || "The exchange-rate ranking has changed.",
-    icon: "./favicon.svg",
-    badge: "./favicon.svg",
+    icon: "./android-chrome-192x192.png?v=2",
+    badge: "./android-chrome-192x192.png?v=2",
     tag: "remit-rate-ranking-change",
     renotify: true,
     data: { url: payload.url || "https://dodongnish.github.io/remit-rate-checker/" },
