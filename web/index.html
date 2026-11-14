@@ -421,6 +421,13 @@
     });
     updateNotificationStatus();
 
+    function formatTransferMethod(value) {
+      const method = String(value || "Not specified").trim();
+      if (/10\\s*Minutes?\\s*Service/i.test(method)) return "10 Minutes";
+      if (/Cash\\s*Pickup\\s*PALAWAN/i.test(method)) return "Cash Pickup";
+      return method.replace(/口座宛/g, "Bank Deposit");
+    }
+
     function render(data) {
       const tbody = $("rates");
       tbody.textContent = "";
@@ -449,7 +456,7 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.className = "provider-name";
-        link.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "Cash Pickup");
+        link.textContent = entry.provider.name;
         const providerDetails = document.createElement("div");
         providerDetails.className = "provider-details";
         providerDetails.appendChild(link);
@@ -484,7 +491,7 @@
         tr.className = "error";
         const cell = document.createElement("td");
         cell.colSpan = 4
-        cell.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "Cash Pickup") + ": Unable to retrieve rates (" + entry.error + ")";
+        cell.textContent = entry.provider.name + ": Unable to retrieve rates (" + entry.error + ")";
         tr.appendChild(cell);
         tbody.appendChild(tr);
       }
