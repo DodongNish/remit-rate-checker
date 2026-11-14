@@ -462,7 +462,7 @@
         providerDetails.appendChild(link);
         const providerMethod = document.createElement("div");
         providerMethod.className = "provider-method";
-        providerMethod.textContent = entry.method.replace(/口座宛/g, "Bank Deposit").replace(/^10\s*Minutes?\s*Service$/i, "Cash Pickup");
+        providerMethod.textContent = formatTransferMethod(entry.method);
         providerDetails.appendChild(providerMethod);
         providerCell.appendChild(providerDetails);
         if (entry.rate === bestRate) {
@@ -476,7 +476,7 @@
         }
         const methodCell = document.createElement("td");
         methodCell.className = "method-column";
-        methodCell.textContent = entry.method.replace(/口座宛/g, "Bank Deposit").replace(/^10\s*Minutes?\s*Service$/i, "Cash Pickup");
+        methodCell.textContent = formatTransferMethod(entry.method);
         const currentCell = document.createElement("td");
         currentCell.className = "current-rate";
         currentCell.textContent = entry.rate.toFixed(6);
