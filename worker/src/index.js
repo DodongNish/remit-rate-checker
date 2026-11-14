@@ -93,30 +93,35 @@ const PROVIDERS = [
   },
   {
     name: "City Express",
-    url: "https://cityremit.com/en/exchange-rates/",
+    url: "https://ctxpress.co.jp/en/exchange-rates/",
     async fetchRates() {
-      // The legacy admin API is protected by Cloudflare and returns a 403
-      // challenge to Worker requests. Read the publicly published official rate page.
-      const pageUrl = "https://cityremit.com/ja/exchange-rates/";
-      const response = await fetch(pageUrl, {
+      const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
+      const response = await fetch(apiUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
-          "Accept": "text/html,application/xhtml+xml",
-          "Accept-Language": "ja,en;q=0.9",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Origin": "https://ctxpress.co.jp",
+          "Referer": "https://ctxpress.co.jp/en/exchange-rates/",
         },
-        signal: AbortSignal.timeout(15000),
+        cache: "no-store",
+        signal: AbortSignal.timeout(12000),
       });
-      if (!response.ok) throw new Error(`Official rate page HTTP ${response.status}`);
-      const html = await response.text();
-      const text = plainText(html);
-      const rateMatch = text.match(/(?:フィリピン|Philippines)\\s+PHP\\s+(\\d+(?:\\.\\d+)?)/i);
-      if (!rateMatch) throw new Error("Philippines PHP rate not found on official rate page");
-      const rate = Number(rateMatch[1]);
-      if (!Number.isFinite(rate) || rate <= 0) throw new Error("Invalid PHP rate on official rate page");
-      const updatedAt = text.match(/(?:最終更新|Last updated)\\s*(\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2})\\s*(?:JST)?/i)?.[1] ?? null;
+      const responseBody = await response.text();
+      if (!response.ok) throw new Error(`API HTTP ${response.status}: ${responseBody.slice(0, 500)}`);
+      let data;
+      try {
+        data = JSON.parse(responseBody);
+      } catch {
+        throw new Error(`API returned invalid JSON: ${responseBody.slice(0, 300)}`);
+      }
+      const rate = Number(data?.rates?.PHP);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new Error("PHP rate not found in API response");
+      }
       return {
         rates: [{ method: "Published rate", rate }],
-        updatedAt: updatedAt ? `${updatedAt} JST` : null,
+        updatedAt: data?.asOf ?? null,
       };
     },
   },
@@ -318,8 +323,11 @@ async function fetchProvider(provider) {
 }
 
 
-async function fetchAllProviders() {
-  return await Promise.all(PROVIDERS.map(fetchProvider));
+async function fetchAllProviders({ excludeCityExpress = false } = {}) {
+  const providers = excludeCityExpress
+    ? PROVIDERS.filter((provider) => provider.name !== "City Express")
+    : PROVIDERS;
+  return await Promise.all(providers.map(fetchProvider));
 }
 
 function getRanking(providers) {
@@ -382,14 +390,16 @@ async function removeSubscription(request, env, corsHeaders) {
   return jsonResponse({ ok: true }, 200, corsHeaders);
 }
 
-async function sendRankingNotifications(env, ranking) {
-  const topEntries = ranking.slice(0, 3).map((id, index) => {
-    const [provider, method] = id.split("::");
-    return (index + 1) + ". " + provider + " — " + method;
-  });
+async function sendRateChangeNotifications(env, providers) {
+  const topEntries = getRanking(providers)
+    .slice(0, 3)
+    .map((id, index) => {
+      const [provider, method] = id.split("::");
+      return (index + 1) + ". " + provider + " — " + method;
+    });
   const payloadData = JSON.stringify({
-    title: "Remittance ranking changed",
-    body: "The exchange-rate ranking has changed.\\n" + topEntries.join("\\n"),
+    title: "Exchange rates updated",
+    body: "Another provider's exchange rate has changed.\\n" + topEntries.join("\\n"),
     url: "https://dodongnish.github.io/remit-rate-checker/",
   });
   const vapid = {
@@ -431,7 +441,10 @@ async function checkRankingAndNotify(env) {
     console.error("Push notification configuration is incomplete.");
     return;
   }
-  const providers = await fetchAllProviders();
+
+  // City Express is our own service. Its API is not available to Cron requests,
+  // so Cron deliberately checks only other providers and never alerts on it.
+  const providers = await fetchAllProviders({ excludeCityExpress: true });
   const failures = providers
     .filter((provider) => provider.error || !provider.rates?.length)
     .map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
@@ -439,39 +452,47 @@ async function checkRankingAndNotify(env) {
     console.warn("Some providers failed; continuing with available rates:", JSON.stringify(failures));
   }
 
-  const ranking = getRanking(providers.filter((provider) => provider.rates?.length));
-  if (!ranking.length) {
-    console.error("Ranking check skipped because no provider returned rates.");
+  const currentRates = Object.fromEntries(
+    providers
+      .filter((provider) => provider.rates?.length)
+      .flatMap((provider) => provider.rates.map((rate) => [
+        provider.name + "::" + (rate.method || "Not specified"),
+        Number(rate.rate),
+      ]))
+      .filter(([, rate]) => Number.isFinite(rate) && rate > 0),
+  );
+  if (!Object.keys(currentRates).length) {
+    console.error("Rate check skipped because no provider returned rates.");
     return;
   }
 
-  const previousRaw = await env.PUSH_KV.get("previous-ranking");
+  const storageKey = "previous-provider-rates";
+  const previousRaw = await env.PUSH_KV.get(storageKey);
   if (!previousRaw) {
-    await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+    await env.PUSH_KV.put(storageKey, JSON.stringify(currentRates));
     return;
   }
 
-  let previous;
-  try { previous = JSON.parse(previousRaw); }
-  catch { previous = null; }
-  if (!Array.isArray(previous) || !previous.length) {
-    await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+  let previousRates;
+  try { previousRates = JSON.parse(previousRaw); }
+  catch { previousRates = null; }
+  if (!previousRates || typeof previousRates !== "object" || Array.isArray(previousRates)) {
+    await env.PUSH_KV.put(storageKey, JSON.stringify(currentRates));
     return;
   }
 
-  // Compare only entries available in both snapshots. This avoids false alerts
-  // when a provider temporarily fails or later recovers.
-  const previousComparable = previous.filter((id) => ranking.includes(id));
-  const currentComparable = ranking.filter((id) => previous.includes(id));
-  const changed = previousComparable.some((id, index) => id !== currentComparable[index]);
+  // Compare rate values, not ranking positions. Only compare entries present
+  // in both snapshots so temporary provider failures/recoveries do not alert.
+  const comparableKeys = Object.keys(currentRates).filter((key) =>
+    Object.prototype.hasOwnProperty.call(previousRates, key)
+  );
+  const changed = comparableKeys.some((key) => currentRates[key] !== Number(previousRates[key]));
 
   if (changed) {
-    await sendRankingNotifications(env, ranking);
+    await sendRateChangeNotifications(env, providers);
   }
 
-  // Refresh the baseline even for partial results. Newly returned entries are
-  // incorporated without generating a false ranking-change notification.
-  await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
+  await env.PUSH_KV.put(storageKey, JSON.stringify(currentRates));
 }
 
 export default {
