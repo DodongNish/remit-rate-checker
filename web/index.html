@@ -423,8 +423,8 @@
 
     function formatTransferMethod(value) {
       const method = String(value || "Not specified").trim();
-      if (/10\\s*Minutes?\\s*Service/i.test(method)) return "10 Minutes";
-      if (/Cash\\s*Pickup\\s*PALAWAN/i.test(method)) return "Cash Pickup";
+      if (/10\s*Minutes?\s*Service/i.test(method)) return "10 Minutes";
+      if (/Cash\s*Pickup\s*PALAWAN/i.test(method)) return "Cash Pickup";
       return method.replace(/口座宛/g, "Bank Deposit");
     }
 
