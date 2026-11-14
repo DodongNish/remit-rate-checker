@@ -390,6 +390,59 @@ async function removeSubscription(request, env, corsHeaders) {
   return jsonResponse({ ok: true }, 200, corsHeaders);
 }
 
+async function sendTestNotification(request, env, corsHeaders) {
+  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+    return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
+  }
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
+    return jsonResponse({ error: "Push notifications are not configured" }, 503, corsHeaders);
+  }
+
+  let subscription;
+  try { subscription = await request.json(); }
+  catch { return jsonResponse({ error: "Invalid JSON body" }, 400, corsHeaders); }
+  if (
+    typeof subscription?.endpoint !== "string" ||
+    !subscription.endpoint.startsWith("https://") ||
+    typeof subscription?.keys?.p256dh !== "string" ||
+    typeof subscription?.keys?.auth !== "string"
+  ) {
+    return jsonResponse({ error: "A valid push subscription is required" }, 400, corsHeaders);
+  }
+
+  const payloadData = JSON.stringify({
+    title: "Test notification",
+    body: "Push notifications are working correctly.",
+    url: "https://dodongnish.github.io/remit-rate-checker/",
+  });
+  const vapid = {
+    subject: "https://github.com/DodongNish/remit-rate-checker",
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  };
+
+  try {
+    const pushRequest = await buildPushPayload(
+      { data: payloadData, options: { ttl: 300 } },
+      subscription,
+      vapid,
+    );
+    const response = await fetch(subscription.endpoint, pushRequest);
+    if (response.status === 404 || response.status === 410) {
+      await env.PUSH_KV.delete(await subscriptionKey(subscription.endpoint));
+      return jsonResponse({ error: "This device subscription has expired. Please enable notifications again." }, 410, corsHeaders);
+    }
+    if (!response.ok) {
+      console.error("Test push delivery failed:", response.status);
+      return jsonResponse({ error: "Push service returned HTTP " + response.status }, 502, corsHeaders);
+    }
+    return jsonResponse({ ok: true }, 200, corsHeaders);
+  } catch (error) {
+    console.error("Test push delivery error:", error);
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 502, corsHeaders);
+  }
+}
+
 async function sendRateChangeNotifications(env, changedProviders) {
   const lines = changedProviders.slice(0, 3).map(({ name, rates }) => {
     const details = rates.map(({ method, rate }) =>
@@ -534,6 +587,10 @@ export default {
 
     if (url.pathname === "/api/push/subscribe" && request.method === "DELETE") {
       return await removeSubscription(request, env, corsHeaders);
+    }
+
+    if (url.pathname === "/api/push/test" && request.method === "POST") {
+      return await sendTestNotification(request, env, corsHeaders);
     }
 
     if (url.pathname !== "/api/rates") {
