@@ -95,12 +95,12 @@ const PROVIDERS = [
     name: "JP Remit",
     url: "https://www.jpremit.com/today-rates#:~:text=Philippines",
     parse(html) {
-      const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
+      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
       for (const row of rows) {
-        if (!/philippines/i.test(row[1]) || !/\\bPHP\\b/i.test(row[1])) continue;
-        const cells = [...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)]
+        if (!/philippines/i.test(row[1]) || !/\bPHP\b/i.test(row[1])) continue;
+        const cells = [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1]));
-        const rateText = [...cells].reverse().find((cell) => /^\\d+(?:\\.\\d+)?$/.test(cell));
+        const rateText = [...cells].reverse().find((cell) => /^\d+(?:\.\d+)?$/.test(cell));
         const rate = Number(rateText);
         if (Number.isFinite(rate) && rate > 0) {
           return [{ method: "Published rate", rate }];
