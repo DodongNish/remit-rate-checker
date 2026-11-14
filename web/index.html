@@ -423,7 +423,7 @@
         methodCell.textContent = entry.method.replace(/口座宛/g, "Bank Deposit");
         const currentCell = document.createElement("td");
         currentCell.className = "current-rate";
-        currentCell.textContent = entry.rate.toFixed(6) + " PHP";
+        currentCell.textContent = entry.rate.toFixed(6);
         const updatedCell = document.createElement("td");
         updatedCell.className = "updated";
         updatedCell.textContent = formatUpdatedAt(entry.updatedAt);
