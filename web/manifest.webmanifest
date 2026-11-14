@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Remittance Rates",
-  "short_name": "Remittance Rates",
+  "name": "Remit Rates",
+  "short_name": "Remit Rates",
   "description": "Compare remittance exchange rates.",
   "start_url": "./",
   "scope": "./",
