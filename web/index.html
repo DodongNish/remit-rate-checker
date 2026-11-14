@@ -102,13 +102,28 @@
     @media (max-width: 520px) {
       th, td { padding: 10px 8px; font-size: .85rem; }
       td.rate, td.current-rate { font-size: .95rem; }
-      td.provider { min-width: 1%; position: relative; padding-right: 34px; }
+      td.provider {
+        min-width: 1%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .provider-details {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
       .provider-name { font-size: .82rem; }
       .provider-method { display: block; }
       td.provider .best-icon {
-        flex: 0 0 auto;
-        margin-left: 0;
+        display: inline-flex;
+        flex: 0 0 19px;
+        width: 19px;
+        height: 19px;
+        margin: 0;
       }
+      td.provider .best-icon svg { display: block; width: 19px; height: 19px; }
       th.method-column, td.method-column { display: none; }
     }
     ol {
