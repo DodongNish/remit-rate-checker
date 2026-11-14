@@ -93,29 +93,30 @@ const PROVIDERS = [
   },
   {
     name: "City Express",
-    url: "https://www.cityremit.com/en/exchange-rates/#:~:text=PHILIPPINES",
+    url: "https://cityremit.com/en/exchange-rates/",
     async fetchRates() {
-      const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
-      const response = await fetch(apiUrl, {
+      // The legacy admin API is protected by Cloudflare and returns a 403
+      // challenge to Worker requests. Read the publicly published official rate page.
+      const pageUrl = "https://cityremit.com/ja/exchange-rates/";
+      const response = await fetch(pageUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-          "Accept": "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Origin": "https://www.cityremit.com",
-          "Referer": "https://www.cityremit.com/en/exchange-rates/",
+          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "ja,en;q=0.9",
         },
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(15000),
       });
-      const responseBody = await response.text();
-      if (!response.ok) throw new Error(`API HTTP ${response.status}: ${responseBody.slice(0, 500)}`);
-      const data = JSON.parse(responseBody);
-      const rate = Number(data?.rates?.PHP);
-      if (!Number.isFinite(rate) || rate <= 0) {
-        throw new Error("PHP rate not found in API response");
-      }
+      if (!response.ok) throw new Error(`Official rate page HTTP ${response.status}`);
+      const html = await response.text();
+      const text = plainText(html);
+      const rateMatch = text.match(/(?:フィリピン|Philippines)\\s+PHP\\s+(\\d+(?:\\.\\d+)?)/i);
+      if (!rateMatch) throw new Error("Philippines PHP rate not found on official rate page");
+      const rate = Number(rateMatch[1]);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("Invalid PHP rate on official rate page");
+      const updatedAt = text.match(/(?:最終更新|Last updated)\\s*(\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2})\\s*(?:JST)?/i)?.[1] ?? null;
       return {
         rates: [{ method: "Published rate", rate }],
-        updatedAt: data?.asOf ?? null,
+        updatedAt: updatedAt ? `${updatedAt} JST` : null,
       };
     },
   },
