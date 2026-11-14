@@ -222,7 +222,6 @@
     <p class="sub" id="current-time">Current time: --</p>
     <div class="notification-controls">
       <button class="btn" id="notification-button" type="button">Enable ranking notifications</button>
-      <button class="btn" id="test-notification-button" type="button" hidden>Send test notification</button>
       <span class="notification-status" id="notification-status" aria-live="polite"></span>
     </div>
     <div class="table-wrap">
@@ -283,7 +282,6 @@
         const registration = await navigator.serviceWorker.getRegistration();
         const subscription = registration ? await registration.pushManager.getSubscription() : null;
         button.textContent = subscription ? "Disable ranking notifications" : "Enable ranking notifications";
-        $("test-notification-button").hidden = !subscription;
         status.textContent = subscription
           ? "Background ranking notifications are enabled on this device."
           : "Get notified even when this page is closed.";
@@ -329,32 +327,22 @@
           });
           if (!saveResponse.ok) throw new Error("Unable to save this device's subscription.");
           status.textContent = "Background ranking notifications enabled.";
+          try {
+            const testResponse = await fetch(API_URL + "/api/push/test", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(subscription),
+            });
+            if (!testResponse.ok) {
+              const result = await testResponse.json().catch(() => ({}));
+              console.error("Test notification failed:", result.error || testResponse.status);
+            }
+          } catch (testError) {
+            console.error("Test notification failed:", testError);
+          }
         }
       } catch (error) {
         status.textContent = error instanceof Error ? error.message : "Unable to update notification settings.";
-      } finally {
-        button.disabled = false;
-        await updateNotificationStatus();
-      }
-    });
-    $("test-notification-button").addEventListener("click", async () => {
-      const button = $("test-notification-button");
-      const status = $("notification-status");
-      button.disabled = true;
-      try {
-        const registration = await navigator.serviceWorker.getRegistration("./");
-        const subscription = registration ? await registration.pushManager.getSubscription() : null;
-        if (!subscription) throw new Error("Enable notifications on this device first.");
-        const response = await fetch(API_URL + "/api/push/test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(subscription),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Unable to send the test notification.");
-        status.textContent = "Test notification sent. Check your device.";
-      } catch (error) {
-        status.textContent = error instanceof Error ? error.message : "Unable to send the test notification.";
       } finally {
         button.disabled = false;
         await updateNotificationStatus();
