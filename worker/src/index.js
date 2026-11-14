@@ -429,29 +429,45 @@ async function checkRankingAndNotify(env) {
     return;
   }
   const providers = await fetchAllProviders();
-  const complete = providers.length === PROVIDERS.length && providers.every((provider) => !provider.error && provider.rates?.length);
-  if (!complete) {
-    const failures = providers.filter((provider) => provider.error || !provider.rates?.length).map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
-    console.error("Ranking check skipped because one or more providers failed:", JSON.stringify(failures));
+  const failures = providers
+    .filter((provider) => provider.error || !provider.rates?.length)
+    .map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
+  if (failures.length) {
+    console.warn("Some providers failed; continuing with available rates:", JSON.stringify(failures));
+  }
+
+  const ranking = getRanking(providers.filter((provider) => provider.rates?.length));
+  if (!ranking.length) {
+    console.error("Ranking check skipped because no provider returned rates.");
     return;
   }
-  const ranking = getRanking(providers);
-  if (!ranking.length) return;
+
   const previousRaw = await env.PUSH_KV.get("previous-ranking");
   if (!previousRaw) {
     await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
     return;
   }
+
   let previous;
   try { previous = JSON.parse(previousRaw); }
   catch { previous = null; }
-  if (!Array.isArray(previous) || previous.length !== ranking.length || previous.some((id) => !ranking.includes(id))) {
+  if (!Array.isArray(previous) || !previous.length) {
     await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
     return;
   }
-  const changed = previous.some((id, index) => id !== ranking[index]);
-  if (!changed) return;
-  await sendRankingNotifications(env, ranking);
+
+  // Compare only entries available in both snapshots. This avoids false alerts
+  // when a provider temporarily fails or later recovers.
+  const previousComparable = previous.filter((id) => ranking.includes(id));
+  const currentComparable = ranking.filter((id) => previous.includes(id));
+  const changed = previousComparable.some((id, index) => id !== currentComparable[index]);
+
+  if (changed) {
+    await sendRankingNotifications(env, ranking);
+  }
+
+  // Refresh the baseline even for partial results. Newly returned entries are
+  // incorporated without generating a false ranking-change notification.
   await env.PUSH_KV.put("previous-ranking", JSON.stringify(ranking));
 }
 
