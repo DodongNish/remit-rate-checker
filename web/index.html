@@ -93,6 +93,7 @@
     td.current-rate { text-align: right; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     td.provider { white-space: nowrap; }
     td.provider a { color: inherit; text-underline-offset: 3px; }
+    .provider-details { display: contents; }
     .provider-name { display: inline-block; white-space: nowrap; }
     .provider-method { display: none; color: var(--muted); font-size: .78rem; font-weight: 400; line-height: 1.3; margin-top: 2px; }
     .tag { display: inline-block; color: var(--best); font-size: .75rem; font-weight: 650; margin-left: 8px; }
@@ -105,10 +106,7 @@
       .provider-name { font-size: .82rem; }
       .provider-method { display: block; }
       td.provider .best-icon {
-        position: absolute;
-        top: 50%;
-        right: 8px;
-        transform: translateY(-50%);
+        flex: 0 0 auto;
         margin-left: 0;
       }
       th.method-column, td.method-column { display: none; }
@@ -437,11 +435,14 @@
         link.rel = "noopener noreferrer";
         link.className = "provider-name";
         link.textContent = entry.provider.name.replace(/^10 Minutes service$/i, "Cash Pickup");
-        providerCell.appendChild(link);
+        const providerDetails = document.createElement("div");
+        providerDetails.className = "provider-details";
+        providerDetails.appendChild(link);
         const providerMethod = document.createElement("div");
         providerMethod.className = "provider-method";
         providerMethod.textContent = entry.method.replace(/口座宛/g, "Bank Deposit");
-        providerCell.appendChild(providerMethod);
+        providerDetails.appendChild(providerMethod);
+        providerCell.appendChild(providerDetails);
         if (entry.rate === bestRate) {
           const tag = document.createElement("span");
           tag.className = "best-icon";
