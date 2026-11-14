@@ -89,7 +89,7 @@ const PROVIDERS = [
             ? "Bank Deposit"
             : /GCASH/i.test(rawMethod)
               ? "Wallet (Gcash)"
-              : /CASH PICKUP/i.test(rawMethod)
+              : /10\s*MINUTES?\s*SERVICE/i.test(rawMethod) || /CASH PICKUP/i.test(rawMethod)
                 ? "Cash Pickup"
                 : rawMethod;
           return rate ? { method, rate: Number(rate[1]) } : null;
