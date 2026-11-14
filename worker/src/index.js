@@ -411,7 +411,7 @@ async function sendTestNotification(request, env, corsHeaders) {
   }
 
   const payloadData = JSON.stringify({
-    title: "Remit Rates",
+    title: "Notification",
     body: "Push notification was enabled.\nYou'll be notified when rates change.",
     url: "https://dodongnish.github.io/remit-rate-checker/",
   });
