@@ -169,11 +169,18 @@
       font-weight: 400;
     }
 
-    .tag {
-      color: var(--best);
-      font-size: .8rem;
-      font-weight: 600;
+    .best-icon {
+      display: inline-flex;
+      align-items: center;
       margin-left: 8px;
+      color: #d69e25;
+      vertical-align: middle;
+    }
+
+    .best-icon svg {
+      display: block;
+      width: 19px;
+      height: 19px;
     }
 
     li.error {
@@ -415,8 +422,11 @@
         providerCell.appendChild(link);
         if (entry.rate === bestRate) {
           const tag = document.createElement("span");
-          tag.className = "tag";
-          tag.textContent = "Best rate";
+          tag.className = "best-icon";
+          tag.setAttribute("role", "img");
+          tag.setAttribute("aria-label", "Best rate");
+          tag.title = "Best rate";
+          tag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4"/></svg>';
           providerCell.appendChild(tag);
         }
         const methodCell = document.createElement("td");
