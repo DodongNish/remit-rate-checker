@@ -94,25 +94,41 @@ const PROVIDERS = [
   {
     name: "JRF",
     url: "https://www.jpremit.com/today-rates#:~:text=Philippines",
-    parse(html) {
-      // The country name is rendered as an image alt attribute, while the
-      // exchange rate is in the adjacent table cell.
-      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
-      for (const row of rows) {
-        const rowWithImageLabels = row[1].replace(
-          /<img\b[^>]*\balt\s*=\s*(["'])(.*?)\1[^>]*>/gi,
-          " $2 ",
-        );
-        const rowText = plainText(rowWithImageLabels);
-        if (!/Philippines/i.test(rowText) || !/\bPHP\b/i.test(rowText)) continue;
+    async fetchRates() {
+      const apiUrl = "https://www.jpremit.com/api/fetch/all/active/countries";
+      const response = await fetch(apiUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error(`API HTTP ${response.status}`);
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error("API returned an unexpected response");
+      const philippines = data.find((country) =>
+        country?.code === "PH" && country?.currency === "PHP" && Number(country?.active) === 1
+      );
+      if (!philippines) throw new Error("Philippines PHP rates not found in API response");
 
-        const numericValues = [...rowText.matchAll(/(?:^|\s)(\d+(?:\.\d+)?)(?=\s|$)/g)]
-          .map((match) => Number(match[1]))
-          .filter((value) => Number.isFinite(value) && value > 0);
-        const rate = numericValues.at(-1);
-        if (rate) return [{ method: "Published rate", rate }];
+      const methods = [
+        ["Bank Deposit", philippines.acc_depo],
+        ["Cash Pickup", philippines.cash_pick],
+        ["Mobile Wallet", philippines.wallet],
+      ];
+      const rates = methods
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .map(([method, value]) => ({ method, rate: Number(value) }))
+        .filter((item) => Number.isFinite(item.rate) && item.rate > 0);
+      if (!rates.length) {
+        const fallbackRate = Number(philippines.fx_rate);
+        if (Number.isFinite(fallbackRate) && fallbackRate > 0) {
+          rates.push({ method: "Published rate", rate: fallbackRate });
+        }
       }
-      throw new Error("Philippines PHP rate not found");
+      if (!rates.length) throw new Error("Philippines PHP rate not found in API response");
+      return { rates, updatedAt: philippines.updated_at ?? null };
     },
   },
   {
