@@ -223,6 +223,18 @@
       color: var(--err);
     }
 
+    #site-moved {
+      margin: 0 0 24px;
+      padding: 20px;
+      border: 1px solid var(--best);
+      border-radius: 10px;
+      background: var(--best-bg);
+    }
+
+    #site-moved h2 { margin: 0 0 8px; font-size: 1.2rem; }
+    #site-moved p { margin: 0 0 12px; }
+    #site-moved a { color: var(--best); font-weight: 700; overflow-wrap: anywhere; }
+
     .manual {
       margin-top: 20px;
       padding-top: 16px;
@@ -269,6 +281,12 @@
 
 <body>
   <main>
+    <section id="site-moved" hidden role="status" aria-live="polite">
+      <h2>This page has moved</h2>
+      <p>Remit Rates is now available at our new address. Please update your bookmark.</p>
+      <p><a href="https://remit-rate-checker.pages.dev/">Open Remit Rates on Cloudflare Pages</a></p>
+      <p>You will be redirected automatically in a few seconds.</p>
+    </section>
     <div class="title-row">
       <h1>Remit Rates</h1>
       <div class="notification-controls">
@@ -294,6 +312,14 @@
     const $ = (id) => document.getElementById(id);
 
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
+
+    // Keep the legacy GitHub Pages address as a short-lived signpost.
+    if (window.location.hostname === "dodongnish.github.io") {
+      $("site-moved").hidden = false;
+      window.setTimeout(() => {
+        window.location.replace("https://remit-rate-checker.pages.dev/");
+      }, 7000);
+    }
 
     function isIOSDevice() {
       return /iPhone|iPad|iPod/.test(navigator.userAgent)
