@@ -500,7 +500,6 @@ async function sendRateChangeNotifications(env, changedProviders) {
   const payloadData = JSON.stringify({
     title: "Exchange rates updated",
     body: lines.join("\n"),
-    url: "https://dodongnish.github.io/remit-rate-checker/",
   });
   const vapid = {
     subject: "https://github.com/DodongNish/remit-rate-checker",
