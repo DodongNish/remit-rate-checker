@@ -12,14 +12,14 @@ self.addEventListener("push", (event) => {
     badge: "./android-chrome-192x192.png?v=2",
     tag: "remit-rate-ranking-change",
     renotify: true,
-    data: { url: payload.url || "https://dodongnish.github.io/remit-rate-checker/" },
+    data: { url: payload.url || self.registration.scope },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || "https://dodongnish.github.io/remit-rate-checker/";
+  const targetUrl = event.notification.data?.url || self.registration.scope;
   event.waitUntil((async () => {
     const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of windows) {
