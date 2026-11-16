@@ -404,7 +404,7 @@ async function subscriptionKey(endpoint) {
 }
 
 async function saveSubscription(request, env, corsHeaders) {
-  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+  if (!["https://dodongnish.github.io", "https://remit-rate-checker.pages.dev"].includes(request.headers.get("Origin"))) {
     return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
   }
   const contentLength = Number(request.headers.get("Content-Length") || 0);
@@ -425,7 +425,7 @@ async function saveSubscription(request, env, corsHeaders) {
 }
 
 async function removeSubscription(request, env, corsHeaders) {
-  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+  if (!["https://dodongnish.github.io", "https://remit-rate-checker.pages.dev"].includes(request.headers.get("Origin"))) {
     return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
   }
   let body;
@@ -439,7 +439,7 @@ async function removeSubscription(request, env, corsHeaders) {
 }
 
 async function sendTestNotification(request, env, corsHeaders) {
-  if (request.headers.get("Origin") !== "https://dodongnish.github.io") {
+  if (!["https://dodongnish.github.io", "https://remit-rate-checker.pages.dev"].includes(request.headers.get("Origin"))) {
     return jsonResponse({ error: "Origin not allowed" }, 403, corsHeaders);
   }
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
@@ -461,7 +461,6 @@ async function sendTestNotification(request, env, corsHeaders) {
   const payloadData = JSON.stringify({
     title: "Notification",
     body: "Push notification was enabled.\nYou'll be notified when rates change.",
-    url: "https://dodongnish.github.io/remit-rate-checker/",
   });
   const vapid = {
     subject: "https://github.com/DodongNish/remit-rate-checker",
