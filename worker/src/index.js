@@ -142,7 +142,7 @@ const PROVIDERS = [
     },
   },
   {
-    name: "Japan Remit",
+    name: "JME",
     url: "https://japanremit.com/exchange-rate/#:~:text=Philippines",
     async fetchRates() {
       const response = await fetch("https://japanremit.com/exchange-rate/", {
