@@ -89,9 +89,11 @@ const PROVIDERS = [
             ? "Bank Deposit"
             : /GCASH/i.test(rawMethod)
               ? "Wallet (Gcash)"
-              : /10\s*MINUTES?\s*SERVICE/i.test(rawMethod) || /CASH PICKUP/i.test(rawMethod)
-                ? "Cash Pickup"
-                : rawMethod;
+              : /10\s*MINUTES?\s*SERVICE/i.test(rawMethod)
+                ? "10 minutes"
+                : /CASH PICKUP/i.test(rawMethod)
+                  ? "Palawan"
+                  : rawMethod;
           return rate ? { method, rate: Number(rate[1]) } : null;
         })
         .filter((item) => item && Number.isFinite(item.rate) && item.rate > 0);
