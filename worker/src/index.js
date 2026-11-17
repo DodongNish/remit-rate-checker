@@ -142,6 +142,57 @@ const PROVIDERS = [
     },
   },
   {
+    name: "Japan Remit",
+    url: "https://japanremit.com/exchange-rate/#:~:text=Philippines",
+    async fetchRates() {
+      const response = await fetch("https://japanremit.com/exchange-rate/", {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; remit-rate-checker/1.0)",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const html = await response.text();
+      const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)]
+        .map((row) => [...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)]
+          .map((cell) => plainText(cell[1])));
+      const rates = [];
+      const seen = new Set();
+      for (const cells of rows) {
+        if (cells.length < 4 || !/^Philippines$/i.test(cells[0]) || !/^PHP$/i.test(cells[2])) continue;
+        const rateMatch = cells[3].match(/([0-9]+(?:\\.[0-9]+)?)/);
+        if (!rateMatch) continue;
+        const rate = Number(rateMatch[1]);
+        if (!Number.isFinite(rate) || rate <= 0) continue;
+        const rawMethods = cells[1].split(/,\\s*/).map((method) => method.trim()).filter(Boolean);
+        for (const rawMethod of rawMethods) {
+          const method = /10\\s*MINUTE\\s*SERVICE/i.test(rawMethod)
+            ? "10 minutes"
+            : /CASH PICK\\s*UP/i.test(rawMethod)
+              ? /CEBUANA/i.test(rawMethod) ? "Cash Pickup (Cebuana)" : "Cash Pickup"
+              : /BANK DEPOSIT/i.test(rawMethod)
+                ? /BDO DIRECT/i.test(rawMethod) ? "Bank Deposit (BDO Direct)" : "Bank Deposit"
+                : /MOBILE WALLET/i.test(rawMethod)
+                  ? /GCASH/i.test(rawMethod) ? "Mobile Wallet (Gcash)" : "Mobile Wallet"
+                  : /MOBILE CASH/i.test(rawMethod)
+                    ? "Mobile Cash"
+                    : /CARD PAYMENT/i.test(rawMethod)
+                      ? "Card Payment"
+                      : rawMethod;
+          const key = method + "::" + rate;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          rates.push({ method, rate });
+        }
+      }
+      if (!rates.length) throw new Error("Philippines PHP rates not found");
+      return { rates, updatedAt: null };
+    },
+  },
+  {
     name: "City Express",
     url: "https://ctxpress.co.jp/en/exchange-rates/",
     async fetchRates() {
