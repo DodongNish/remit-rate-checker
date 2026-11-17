@@ -156,8 +156,8 @@ const PROVIDERS = [
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const html = await response.text();
-      const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)]
-        .map((row) => [...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)]
+      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+        .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1])));
       const rates = [];
       const seen = new Set();
@@ -169,12 +169,12 @@ const PROVIDERS = [
         "MOBILE WALLET": "Mobile Wallet",
       };
       for (const cells of rows) {
-        if (cells.length < 4 || !/\\bPhilippines\\b/i.test(cells[0]) || !/^PHP$/i.test(cells[2])) continue;
-        const rateMatch = cells[3].match(/([0-9]+(?:\\.[0-9]+)?)/);
+        if (cells.length < 4 || !/\bPhilippines\b/i.test(cells[0]) || !/^PHP$/i.test(cells[2])) continue;
+        const rateMatch = cells[3].match(/([0-9]+(?:\.[0-9]+)?)/);
         if (!rateMatch) continue;
         const rate = Number(rateMatch[1]);
         if (!Number.isFinite(rate) || rate <= 0) continue;
-        const rawMethods = cells[1].split(/,\\s*/).map((method) => method.trim()).filter(Boolean);
+        const rawMethods = cells[1].split(/,\s*/).map((method) => method.trim()).filter(Boolean);
         for (const rawMethod of rawMethods) {
           const method = methodNames[rawMethod.toUpperCase()];
           if (!method) continue;
