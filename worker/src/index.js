@@ -156,22 +156,22 @@ const PROVIDERS = [
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const html = await response.text();
-      const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)]
-        .map((row) => [...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)]
+      const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+        .map((row) => [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
           .map((cell) => plainText(cell[1])));
       const rates = [];
       const seen = new Set();
       for (const cells of rows) {
         if (cells.length < 4 || !/^Philippines$/i.test(cells[0]) || !/^PHP$/i.test(cells[2])) continue;
-        const rateMatch = cells[3].match(/([0-9]+(?:\\.[0-9]+)?)/);
+        const rateMatch = cells[3].match(/([0-9]+(?:\.[0-9]+)?)/);
         if (!rateMatch) continue;
         const rate = Number(rateMatch[1]);
         if (!Number.isFinite(rate) || rate <= 0) continue;
-        const rawMethods = cells[1].split(/,\\s*/).map((method) => method.trim()).filter(Boolean);
+        const rawMethods = cells[1].split(/,\s*/).map((method) => method.trim()).filter(Boolean);
         for (const rawMethod of rawMethods) {
-          const method = /10\\s*MINUTE\\s*SERVICE/i.test(rawMethod)
+          const method = /10\s*MINUTE\s*SERVICE/i.test(rawMethod)
             ? "10 minutes"
-            : /CASH PICK\\s*UP/i.test(rawMethod)
+            : /CASH PICK\s*UP/i.test(rawMethod)
               ? /CEBUANA/i.test(rawMethod) ? "Cash Pickup (Cebuana)" : "Cash Pickup"
               : /BANK DEPOSIT/i.test(rawMethod)
                 ? /BDO DIRECT/i.test(rawMethod) ? "Bank Deposit (BDO Direct)" : "Bank Deposit"
