@@ -252,6 +252,47 @@ const PROVIDERS = [
         updatedAt: data?.asOf ?? null,
       };
     },
+    async fetchTrackingRates(env) {
+      const cacheKey = "provider-rate:city-express";
+      const cacheTtlSeconds = 300;
+      const cachedRaw = env?.PUSH_KV ? await env.PUSH_KV.get(cacheKey) : null;
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          const age = Date.now() - new Date(cached.updatedAt).getTime();
+          if (cached.rate > 0 && Number.isFinite(cached.rate) && age >= 0 && age < cacheTtlSeconds * 1000) {
+            return { rates: [{ method: "Published rate", rate: cached.rate }], updatedAt: cached.updatedAt };
+          }
+        } catch {
+          // Ignore invalid cache data and fetch a fresh rate.
+        }
+      }
+
+      if (!env?.BROWSER) throw new Error("Cloudflare Browser Run binding is not configured");
+      const response = await env.BROWSER.quickAction("scrape", {
+        url: "https://ctxpress.co.jp/en/exchange-rates/",
+        gotoOptions: { waitUntil: "networkidle2", timeout: 60000 },
+        waitForSelector: { selector: "table tr", timeout: 30000 },
+        elements: [{ selector: "body" }],
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Browser Run HTTP ${response.status}: ${body.slice(0, 300)}`);
+      }
+      const data = await response.json();
+      const pageText = data?.result?.find((item) => item.selector === "body")?.results?.[0]?.text ?? "";
+      const philippinesRow = pageText.match(/Philippines\\s+PHP\\s+([0-9]+(?:\\.[0-9]+)?)/i);
+      const rate = philippinesRow ? Number(philippinesRow[1]) : NaN;
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new Error("City Express Philippines PHP rate not found in rendered page");
+      }
+      const updatedAt = pageText.match(/Last updated\\s+([^\\n]+)/i)?.[1]?.trim() ?? new Date().toISOString();
+      const result = { rates: [{ method: "Published rate", rate }], updatedAt };
+      if (env.PUSH_KV) {
+        await env.PUSH_KV.put(cacheKey, JSON.stringify({ rate, updatedAt: new Date().toISOString() }), { expirationTtl: cacheTtlSeconds });
+      }
+      return result;
+    },
   },
 ];
 
@@ -414,8 +455,17 @@ async function inspectSBI() {
   }
   return { initial: { status: initial.status, finalUrl: initial.url, setCookie, cookie, htmlLength: initialHtml.length, tokenFound: Boolean(token), viewStateFound: Boolean(viewState) }, postResult, exchangePage };
 }
-async function fetchProvider(provider, env) {
+async function fetchProvider(provider, env, { useBrowserForCityExpress = false } = {}) {
   try {
+    if (useBrowserForCityExpress && provider.name === "City Express" && provider.fetchTrackingRates) {
+      const result = await provider.fetchTrackingRates(env);
+      return {
+        name: provider.name,
+        url: provider.url,
+        rates: result.rates,
+        updatedAt: result.updatedAt ?? null,
+      };
+    }
     if (provider.fetchRates) {
       const result = await provider.fetchRates(env);
       return {
@@ -451,11 +501,13 @@ async function fetchProvider(provider, env) {
 }
 
 
-async function fetchAllProviders({ excludeCityExpress = false } = {}, env) {
+async function fetchAllProviders({ excludeCityExpress = false, useBrowserForCityExpress = false } = {}, env) {
   const providers = excludeCityExpress
     ? PROVIDERS.filter((provider) => provider.name !== "City Express")
     : PROVIDERS;
-  return await Promise.all(providers.map((provider) => fetchProvider(provider, env)));
+  return await Promise.all(providers.map((provider) =>
+    fetchProvider(provider, env, { useBrowserForCityExpress })
+  ));
 }
 
 async function collectAndSaveRateHistory(env) {
@@ -464,7 +516,7 @@ async function collectAndSaveRateHistory(env) {
     return;
   }
 
-  const providers = await fetchAllProviders({}, env);
+  const providers = await fetchAllProviders({ useBrowserForCityExpress: true }, env);
   const recordedAt = new Date().toISOString();
   const statements = providers.flatMap((provider) =>
     (provider.rates || [])
@@ -648,9 +700,9 @@ async function checkRankingAndNotify(env) {
     return;
   }
 
-  // City Express is our own service. Its API is not available to Cron requests,
-  // so Cron deliberately checks only other providers and never alerts on it.
-  const providers = await fetchAllProviders({ excludeCityExpress: true }, env);
+  // Use a rendered browser scrape for City Express only in scheduled tracking.
+  // The normal /api/rates endpoint continues to use its existing direct API fetch.
+  const providers = await fetchAllProviders({ useBrowserForCityExpress: true }, env);
   const failures = providers
     .filter((provider) => provider.error || !provider.rates?.length)
     .map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
