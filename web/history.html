@@ -37,20 +37,15 @@
     .hint{color:var(--muted);font-size:.82rem;margin-top:12px}
     .empty,.error{padding:42px 12px;text-align:center;color:var(--muted)}
     .error{color:#b54737}
-    .modal-backdrop{position:fixed;inset:0;background:rgba(4,13,18,.58);display:grid;place-items:center;padding:18px;z-index:10}
-    .modal-backdrop[hidden]{display:none}
-    .modal{width:min(100%,520px);max-height:min(82vh,720px);overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:flex;flex-direction:column}
-    .modal-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-    .modal-date{font-weight:750;font-size:1.05rem}
-    .modal-caption{font-size:.8rem;color:var(--muted);margin-top:3px}
-    .close{border:0;background:transparent;color:var(--muted);font-size:1.25rem;padding:2px 5px}
-    .rate-list{overflow:auto;padding:8px 14px 14px}
-    .rate-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;padding:12px 6px;border-bottom:1px solid var(--line)}
-    .rate-row:last-child{border-bottom:0}
-    .provider{font-weight:700}
-    .method{font-size:.82rem;color:var(--muted)}
-    .rate-value{grid-column:2;grid-row:1 / span 2;align-self:center;font-weight:750;font-variant-numeric:tabular-nums;font-size:1.05rem}
-    .best-tag{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:5px;background:var(--best-bg);color:var(--best);font-size:.68rem;font-weight:700;vertical-align:2px}
+    .rate-popover{position:absolute;z-index:5;width:min(290px,calc(100% - 16px));max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px;pointer-events:none;transform:translate(-50%,-100%);display:none}
+    .rate-popover.visible{display:block}
+    .popover-date{font-weight:750;font-size:.9rem;margin-bottom:8px}
+    .popover-caption{font-size:.72rem;color:var(--muted);margin-bottom:5px}
+    .popover-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:.78rem}
+    .popover-provider{font-weight:650}
+    .popover-method{display:block;color:var(--muted);font-size:.7rem}
+    .popover-rate{font-weight:750;font-variant-numeric:tabular-nums;align-self:center}
+    .best-tag{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:4px;background:var(--best-bg);color:var(--best);font-size:.62rem;font-weight:700;vertical-align:2px}
     footer{margin-top:22px;color:var(--muted);font-size:.8rem}
     @media(max-width:560px){main{padding:20px 12px 40px}.panel{padding:14px}.chart-wrap{height:330px}.toolbar{align-items:flex-start}.modal-backdrop{padding:10px}.modal-head{padding:16px}}
   </style>
@@ -73,7 +68,7 @@
         <span class="status" id="status">Loading history…</span>
       </div>
       <div id="chart-area" class="chart-wrap"><canvas id="history-chart" aria-label="Exchange rate history chart"></canvas></div>
-      <p class="hint"><i class="fa-regular fa-hand-pointer" aria-hidden="true"></i> Select any point on the chart to see all available rates at that time.</p>
+      <p class="hint"><i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> Slide your finger or move your cursor across the chart to explore rates at each snapshot.</p>
     </section>
     <footer>
       <p>Rates are indicative. Historical records begin when tracking was enabled; earlier rates are not available.</p>
@@ -81,18 +76,7 @@
     </footer>
   </main>
 
-  <div class="modal-backdrop" id="snapshot-modal" hidden>
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-date">
-      <div class="modal-head">
-        <div>
-          <div class="modal-date" id="modal-date">Rate snapshot</div>
-          <div class="modal-caption">Available provider rates at this time</div>
-        </div>
-        <button class="close" id="modal-close" type="button" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="rate-list" id="modal-rates"></div>
-    </section>
-  </div>
+  <div class="rate-popover" id="rate-popover" aria-live="polite"></div>
 
   <script>
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
@@ -108,19 +92,28 @@
       }).format(new Date(value)) + " JST";
     }
 
-    function showSnapshot(index) {
+    function showSnapshot(index, chartInstance) {
       const snapshot = snapshots[index];
       if (!snapshot) return;
       const rows = snapshot.records.slice().sort((a, b) => b.rate - a.rate);
       const bestRate = rows.length ? rows[0].rate : null;
-      $("modal-date").textContent = formatDate(snapshot.recordedAt);
-      const list = $("modal-rates");
-      list.replaceChildren();
+      const popover = $("rate-popover");
+      popover.replaceChildren();
+
+      const date = document.createElement("div");
+      date.className = "popover-date";
+      date.textContent = formatDate(snapshot.recordedAt);
+      const caption = document.createElement("div");
+      caption.className = "popover-caption";
+      caption.textContent = "Available rates · JPY to PHP";
+      popover.append(date, caption);
+
       for (const item of rows) {
         const row = document.createElement("div");
-        row.className = "rate-row";
-        const provider = document.createElement("div");
-        provider.className = "provider";
+        row.className = "popover-row";
+        const name = document.createElement("div");
+        const provider = document.createElement("span");
+        provider.className = "popover-provider";
         provider.textContent = item.provider;
         if (item.rate === bestRate) {
           const tag = document.createElement("span");
@@ -128,27 +121,29 @@
           tag.textContent = "BEST";
           provider.appendChild(tag);
         }
-        const method = document.createElement("div");
-        method.className = "method";
+        const method = document.createElement("span");
+        method.className = "popover-method";
         method.textContent = item.method;
-        const rate = document.createElement("div");
-        rate.className = "rate-value";
+        name.append(provider, method);
+        const rate = document.createElement("span");
+        rate.className = "popover-rate";
         rate.textContent = Number(item.rate).toFixed(6);
-        row.append(provider, method, rate);
-        list.appendChild(row);
+        row.append(name, rate);
+        popover.appendChild(row);
       }
-      $("snapshot-modal").hidden = false;
-      $("modal-close").focus();
+
+      const x = chartInstance.scales.x.getPixelForValue(index);
+      const y = chartInstance.chartArea.top + 8;
+      const width = popover.offsetWidth || 290;
+      const left = Math.max(width / 2 + 8, Math.min(chartInstance.width - width / 2 - 8, x));
+      popover.style.left = left + "px";
+      popover.style.top = Math.max(8, y + popover.offsetHeight + 12) + "px";
+      popover.classList.add("visible");
     }
 
-    function closeModal() { $("snapshot-modal").hidden = true; }
-    $("modal-close").addEventListener("click", closeModal);
-    $("snapshot-modal").addEventListener("click", (event) => {
-      if (event.target === $("snapshot-modal")) closeModal();
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeModal();
-    });
+    function hidePopover() {
+      $("rate-popover").classList.remove("visible");
+    }
 
     function renderChart(records) {
       const byTime = new Map();
@@ -185,7 +180,7 @@
         data: { labels, datasets },
         options: {
           responsive: true, maintainAspectRatio: false,
-          interaction: { mode: "nearest", intersect: true },
+          interaction: { mode: "index", intersect: false, axis: "x" },
           plugins: {
             legend: { position: "bottom", labels: { color: getComputedStyle(document.body).color, usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } } },
             tooltip: { callbacks: { label: (context) => context.dataset.label + ": " + Number(context.parsed.y).toFixed(6) } }
@@ -194,12 +189,13 @@
             x: { ticks: { color: "#82919a", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
             y: { ticks: { color: "#82919a", callback: (value) => Number(value).toFixed(4) }, grid: { color: "rgba(130,145,154,.16)" } }
           },
-          onClick: (event, elements) => {
+          onHover: (event, elements, chartInstance) => {
             if (!elements.length) return;
-            showSnapshot(elements[0].index);
+            showSnapshot(elements[0].index, chartInstance);
           }
         }
       });
+      $("chart-area").addEventListener("mouseleave", hidePopover);
     }
 
     async function loadHistory(days) {
