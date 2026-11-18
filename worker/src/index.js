@@ -103,7 +103,7 @@ const PROVIDERS = [
   },
   {
     name: "JRF",
-    url: "https://www.jpremit.com/today-rates#:~:text=Philippines",
+    url: "https://www.jpremit.com/today-rates",
     async fetchRates() {
       const apiUrl = "https://www.jpremit.com/api/fetch/all/active/countries";
       const response = await fetch(apiUrl, {
@@ -122,23 +122,12 @@ const PROVIDERS = [
       );
       if (!philippines) throw new Error("Philippines PHP rates not found in API response");
 
-      const methods = [
-        ["Bank Deposit", philippines.acc_depo],
-        ["Cash Pickup", philippines.cash_pick],
-        ["Mobile Wallet", philippines.wallet],
-      ];
-      const rates = methods
-        .filter(([, value]) => value !== null && value !== undefined && value !== "")
-        .map(([method, value]) => ({ method, rate: Number(value) }))
-        .filter((item) => Number.isFinite(item.rate) && item.rate > 0);
-      if (!rates.length) {
-        const fallbackRate = Number(philippines.fx_rate);
-        if (Number.isFinite(fallbackRate) && fallbackRate > 0) {
-          rates.push({ method: "Published rate", rate: fallbackRate });
-        }
-      }
-      if (!rates.length) throw new Error("Philippines PHP rate not found in API response");
-      return { rates, updatedAt: philippines.updated_at ?? null };
+      const rate = Number(philippines.fx_rate);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("JRF published PHP rate not found");
+      return {
+        rates: [{ method: "Published rate", rate }],
+        updatedAt: philippines.updated_at ?? null,
+      };
     },
   },
   {
