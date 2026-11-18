@@ -208,7 +208,7 @@ const PROVIDERS = [
         throw new Error(`Browser Run HTTP ${response.status}: ${body.slice(0, 300)}`);
       }
       const data = await response.json();
-      const displayedRate = data?.result?.find((item) => item.selector === ".fx-to")?.results?.text;
+      const displayedRate = data?.result?.find((item) => item.selector === ".fx-to")?.results?.[0]?.text;
       const match = String(displayedRate ?? "").match(/([0-9]+(?:\.[0-9]+)?)/);
       const rate = match ? Number(match[1]) : NaN;
       if (!Number.isFinite(rate) || rate <= 0) throw new Error("Western Union JPY/PHP rate not found");
