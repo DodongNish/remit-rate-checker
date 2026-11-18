@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4">
+  <link rel="manifest" href="./manifest.webmanifest?v=2">
+  <meta name="theme-color" content="#0f7a52">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Remit Rates">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <title>Rate History | Remit Rates</title>
+  <style>
+    :root { --bg:#f2f5f7; --surface:#fff; --ink:#14232b; --muted:#5d6e77; --line:#d5dde2; --best:#0f7a52; --best-bg:#e3f3ec; --shadow:0 18px 55px rgba(16,35,43,.18); }
+    @media(prefers-color-scheme:dark){:root{--bg:#10181d;--surface:#172229;--ink:#e8eff2;--muted:#93a5ae;--line:#2a3a43;--best:#4fcf96;--best-bg:#17332a;--shadow:0 18px 55px rgba(0,0,0,.45)}}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:900px;margin:0 auto;padding:28px 16px 56px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+    h1{font-size:1.5rem;margin:0}
+    h2{font-size:1rem;margin:0}
+    p{margin:0}
+    .back{display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;font-size:.9rem}
+    .back:hover{color:var(--best)}
+    .sub{color:var(--muted);font-size:.9rem;margin-bottom:20px}
+    .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+    .ranges{display:flex;gap:6px;flex-wrap:wrap}
+    button{font:inherit;cursor:pointer}
+    .range{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:8px 12px;font-size:.85rem}
+    .range[aria-pressed=true]{background:var(--best-bg);border-color:var(--best);color:var(--best);font-weight:650}
+    .status{color:var(--muted);font-size:.82rem}
+    .chart-wrap{height:390px;position:relative}
+    .hint{color:var(--muted);font-size:.82rem;margin-top:12px}
+    .empty,.error{padding:42px 12px;text-align:center;color:var(--muted)}
+    .error{color:#b54737}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(4,13,18,.58);display:grid;place-items:center;padding:18px;z-index:10}
+    .modal-backdrop[hidden]{display:none}
+    .modal{width:min(100%,520px);max-height:min(82vh,720px);overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+    .modal-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .modal-date{font-weight:750;font-size:1.05rem}
+    .modal-caption{font-size:.8rem;color:var(--muted);margin-top:3px}
+    .close{border:0;background:transparent;color:var(--muted);font-size:1.25rem;padding:2px 5px}
+    .rate-list{overflow:auto;padding:8px 14px 14px}
+    .rate-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;padding:12px 6px;border-bottom:1px solid var(--line)}
+    .rate-row:last-child{border-bottom:0}
+    .provider{font-weight:700}
+    .method{font-size:.82rem;color:var(--muted)}
+    .rate-value{grid-column:2;grid-row:1 / span 2;align-self:center;font-weight:750;font-variant-numeric:tabular-nums;font-size:1.05rem}
+    .best-tag{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:5px;background:var(--best-bg);color:var(--best);font-size:.68rem;font-weight:700;vertical-align:2px}
+    footer{margin-top:22px;color:var(--muted);font-size:.8rem}
+    @media(max-width:560px){main{padding:20px 12px 40px}.panel{padding:14px}.chart-wrap{height:330px}.toolbar{align-items:flex-start}.modal-backdrop{padding:10px}.modal-head{padding:16px}}
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Rate History</h1>
+      <a class="back" href="./"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to rates</a>
+    </header>
+    <p class="sub">Compare how JPY to PHP exchange rates have changed over time.</p>
+    <section class="panel">
+      <div class="toolbar">
+        <div class="ranges" aria-label="History range">
+          <button class="range" data-days="30" aria-pressed="false">1 month</button>
+          <button class="range" data-days="90" aria-pressed="true">3 months</button>
+          <button class="range" data-days="180" aria-pressed="false">6 months</button>
+          <button class="range" data-days="365" aria-pressed="false">1 year</button>
+        </div>
+        <span class="status" id="status">Loading history…</span>
+      </div>
+      <div id="chart-area" class="chart-wrap"><canvas id="history-chart" aria-label="Exchange rate history chart"></canvas></div>
+      <p class="hint"><i class="fa-regular fa-hand-pointer" aria-hidden="true"></i> Select any point on the chart to see all available rates at that time.</p>
+    </section>
+    <footer>
+      <p>Rates are indicative. Historical records begin when tracking was enabled; earlier rates are not available.</p>
+      <p>Snapshots are collected daily at 21:00 JST. Failed provider fetches are left blank rather than carrying forward old rates.</p>
+    </footer>
+  </main>
+
+  <div class="modal-backdrop" id="snapshot-modal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-date">
+      <div class="modal-head">
+        <div>
+          <div class="modal-date" id="modal-date">Rate snapshot</div>
+          <div class="modal-caption">Available provider rates at this time</div>
+        </div>
+        <button class="close" id="modal-close" type="button" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="rate-list" id="modal-rates"></div>
+    </section>
+  </div>
+
+  <script>
+    const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
+    const $ = (id) => document.getElementById(id);
+    let chart;
+    let snapshots = [];
+    let selectedDays = 90;
+
+    function formatDate(value, options = {}) {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Tokyo", month: "short", day: "numeric",
+        year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, ...options
+      }).format(new Date(value)) + " JST";
+    }
+
+    function showSnapshot(index) {
+      const snapshot = snapshots[index];
+      if (!snapshot) return;
+      const rows = snapshot.records.slice().sort((a, b) => b.rate - a.rate);
+      const bestRate = rows.length ? rows[0].rate : null;
+      $("modal-date").textContent = formatDate(snapshot.recordedAt);
+      const list = $("modal-rates");
+      list.replaceChildren();
+      for (const item of rows) {
+        const row = document.createElement("div");
+        row.className = "rate-row";
+        const provider = document.createElement("div");
+        provider.className = "provider";
+        provider.textContent = item.provider;
+        if (item.rate === bestRate) {
+          const tag = document.createElement("span");
+          tag.className = "best-tag";
+          tag.textContent = "BEST";
+          provider.appendChild(tag);
+        }
+        const method = document.createElement("div");
+        method.className = "method";
+        method.textContent = item.method;
+        const rate = document.createElement("div");
+        rate.className = "rate-value";
+        rate.textContent = Number(item.rate).toFixed(6);
+        row.append(provider, method, rate);
+        list.appendChild(row);
+      }
+      $("snapshot-modal").hidden = false;
+      $("modal-close").focus();
+    }
+
+    function closeModal() { $("snapshot-modal").hidden = true; }
+    $("modal-close").addEventListener("click", closeModal);
+    $("snapshot-modal").addEventListener("click", (event) => {
+      if (event.target === $("snapshot-modal")) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeModal();
+    });
+
+    function renderChart(records) {
+      const byTime = new Map();
+      const seriesKeys = new Set();
+      for (const record of records) {
+        if (!byTime.has(record.recordedAt)) byTime.set(record.recordedAt, []);
+        byTime.get(record.recordedAt).push(record);
+        seriesKeys.add(record.provider + "::" + record.method);
+      }
+      snapshots = [...byTime.entries()].map(([recordedAt, items]) => ({ recordedAt, records: items }));
+      const labels = snapshots.map((snapshot) => formatDate(snapshot.recordedAt, { year: undefined, hour: "2-digit", minute: "2-digit" }));
+      const colors = ["#0f7a52","#2563eb","#d97706","#9333ea","#0891b2","#dc2626","#65a30d","#db2777","#475569","#0d9488","#7c3aed","#ea580c"];
+      const datasets = [...seriesKeys].sort().map((key, index) => {
+        const [provider, method] = key.split("::");
+        const values = snapshots.map((snapshot) => {
+          const entry = snapshot.records.find((record) => record.provider === provider && record.method === method);
+          return entry ? Number(entry.rate) : null;
+        });
+        return {
+          label: provider + " · " + method,
+          data: values,
+          borderColor: colors[index % colors.length],
+          backgroundColor: colors[index % colors.length],
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          borderWidth: 2,
+          spanGaps: false,
+          tension: .25
+        };
+      });
+      if (chart) chart.destroy();
+      chart = new Chart($("history-chart"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: "nearest", intersect: true },
+          plugins: {
+            legend: { position: "bottom", labels: { color: getComputedStyle(document.body).color, usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } } },
+            tooltip: { callbacks: { label: (context) => context.dataset.label + ": " + Number(context.parsed.y).toFixed(6) } }
+          },
+          scales: {
+            x: { ticks: { color: "#82919a", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
+            y: { ticks: { color: "#82919a", callback: (value) => Number(value).toFixed(4) }, grid: { color: "rgba(130,145,154,.16)" } }
+          },
+          onClick: (event, elements) => {
+            if (!elements.length) return;
+            showSnapshot(elements[0].index);
+          }
+        }
+      });
+    }
+
+    async function loadHistory(days) {
+      selectedDays = days;
+      document.querySelectorAll(".range").forEach((button) => button.setAttribute("aria-pressed", String(Number(button.dataset.days) === days)));
+      $("status").textContent = "Loading…";
+      $("chart-area").hidden = false;
+      try {
+        const response = await fetch(API_URL + "/api/history?days=" + days, { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
+        if (!data.records?.length) {
+          if (chart) { chart.destroy(); chart = null; }
+          $("chart-area").innerHTML = '<div class="empty">No history has been collected yet.<br>Daily snapshots will appear here after the first collection.</div>';
+          $("status").textContent = "No records yet";
+          return;
+        }
+        if (!$("chart-area").querySelector("canvas")) $("chart-area").innerHTML = '<canvas id="history-chart" aria-label="Exchange rate history chart"></canvas>';
+        renderChart(data.records);
+        $("status").textContent = snapshots.length + " snapshots · " + data.records.length + " rates";
+      } catch (error) {
+        $("status").textContent = "Unable to load history";
+        $("chart-area").innerHTML = '<div class="error">Could not load rate history. Please try again later.</div>';
+        console.error(error);
+      }
+    }
+
+    document.querySelectorAll(".range").forEach((button) => button.addEventListener("click", () => loadHistory(Number(button.dataset.days))));
+    loadHistory(selectedDays);
+  </script>
+</body>
+</html>
