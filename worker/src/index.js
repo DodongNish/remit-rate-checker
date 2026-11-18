@@ -281,12 +281,12 @@ const PROVIDERS = [
       }
       const data = await response.json();
       const pageText = data?.result?.find((item) => item.selector === "body")?.results?.[0]?.text ?? "";
-      const philippinesRow = pageText.match(/Philippines\\s+PHP\\s+([0-9]+(?:\\.[0-9]+)?)/i);
+      const philippinesRow = pageText.match(/Philippines\s+PHP\s+([0-9]+(?:\.[0-9]+)?)/i);
       const rate = philippinesRow ? Number(philippinesRow[1]) : NaN;
       if (!Number.isFinite(rate) || rate <= 0) {
         throw new Error("City Express Philippines PHP rate not found in rendered page");
       }
-      const updatedAt = pageText.match(/Last updated\\s+([^\\n]+)/i)?.[1]?.trim() ?? new Date().toISOString();
+      const updatedAt = pageText.match(/Last updated\s+([^\n]+)/i)?.[1]?.trim() ?? new Date().toISOString();
       const result = { rates: [{ method: "Published rate", rate }], updatedAt };
       if (env.PUSH_KV) {
         await env.PUSH_KV.put(cacheKey, JSON.stringify({ rate, updatedAt: new Date().toISOString() }), { expirationTtl: cacheTtlSeconds });
