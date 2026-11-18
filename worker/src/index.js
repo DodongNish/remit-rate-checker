@@ -152,7 +152,7 @@ const PROVIDERS = [
       const seen = new Set();
       const methodNames = {
         "CASH PICK UP": "Cash Pickup",
-        "MOBILE CASH": "Cash Pickup",
+        "MOBILE CASH": "Mobile Cash",
         "BANK DEPOSIT": "Bank Deposit",
         "CARD PAYMENT": "Card Payment",
         "MOBILE WALLET": "Mobile Wallet",
