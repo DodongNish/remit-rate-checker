@@ -158,6 +158,13 @@
       }
     }
 
+    document.addEventListener("pointerdown", (event) => {
+      const canvas = $("history-chart");
+      if (!chart || canvas?.contains(event.target)) return;
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      chart.update("none");
+    });
+
     document.querySelectorAll(".range").forEach((button) => button.addEventListener("click", () => loadHistory(Number(button.dataset.days))));
     loadHistory(selectedDays);
   </script>
