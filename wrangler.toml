@@ -10,5 +10,10 @@ id = "4353d85ebc96488792ec1bbd1a3aea53"
 [browser]
 binding = "BROWSER"
 
+[[d1_databases]]
+binding = "RATE_HISTORY"
+database_name = "remit-rate-history"
+database_id = "56d530c8-9e53-4665-ba3d-848b715efa5e"
+
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "0 12 * * *"]
