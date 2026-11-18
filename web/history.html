@@ -37,15 +37,6 @@
     .hint{color:var(--muted);font-size:.82rem;margin-top:12px}
     .empty,.error{padding:42px 12px;text-align:center;color:var(--muted)}
     .error{color:#b54737}
-    .rate-popover{position:absolute;z-index:5;width:min(290px,calc(100% - 16px));max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px;pointer-events:none;transform:translate(-50%,-100%);display:none}
-    .rate-popover.visible{display:block}
-    .popover-date{font-weight:750;font-size:.9rem;margin-bottom:8px}
-    .popover-caption{font-size:.72rem;color:var(--muted);margin-bottom:5px}
-    .popover-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:.78rem}
-    .popover-provider{font-weight:650}
-    .popover-method{display:block;color:var(--muted);font-size:.7rem}
-    .popover-rate{font-weight:750;font-variant-numeric:tabular-nums;align-self:center}
-    .best-tag{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:4px;background:var(--best-bg);color:var(--best);font-size:.62rem;font-weight:700;vertical-align:2px}
     footer{margin-top:22px;color:var(--muted);font-size:.8rem}
     @media(max-width:560px){main{padding:20px 12px 40px}.panel{padding:14px}.chart-wrap{height:330px}.toolbar{align-items:flex-start}.modal-backdrop{padding:10px}.modal-head{padding:16px}}
   </style>
@@ -76,7 +67,6 @@
     </footer>
   </main>
 
-  <div class="rate-popover" id="rate-popover" aria-live="polite"></div>
 
   <script>
     const API_URL = "https://remit-rate-checker.dodongnish.workers.dev";
@@ -90,59 +80,6 @@
         timeZone: "Asia/Tokyo", month: "short", day: "numeric",
         year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, ...options
       }).format(new Date(value)) + " JST";
-    }
-
-    function showSnapshot(index, chartInstance) {
-      const snapshot = snapshots[index];
-      if (!snapshot) return;
-      const rows = snapshot.records.slice().sort((a, b) => b.rate - a.rate);
-      const bestRate = rows.length ? rows[0].rate : null;
-      const popover = $("rate-popover");
-      popover.replaceChildren();
-
-      const date = document.createElement("div");
-      date.className = "popover-date";
-      date.textContent = formatDate(snapshot.recordedAt);
-      const caption = document.createElement("div");
-      caption.className = "popover-caption";
-      caption.textContent = "Available rates · JPY to PHP";
-      popover.append(date, caption);
-
-      for (const item of rows) {
-        const row = document.createElement("div");
-        row.className = "popover-row";
-        const name = document.createElement("div");
-        const provider = document.createElement("span");
-        provider.className = "popover-provider";
-        provider.textContent = item.provider;
-        if (item.rate === bestRate) {
-          const tag = document.createElement("span");
-          tag.className = "best-tag";
-          tag.textContent = "BEST";
-          provider.appendChild(tag);
-        }
-        const method = document.createElement("span");
-        method.className = "popover-method";
-        method.textContent = item.method;
-        name.append(provider, method);
-        const rate = document.createElement("span");
-        rate.className = "popover-rate";
-        rate.textContent = Number(item.rate).toFixed(6);
-        row.append(name, rate);
-        popover.appendChild(row);
-      }
-
-      const x = chartInstance.scales.x.getPixelForValue(index);
-      const y = chartInstance.chartArea.top + 8;
-      const width = popover.offsetWidth || 290;
-      const left = Math.max(width / 2 + 8, Math.min(chartInstance.width - width / 2 - 8, x));
-      popover.style.left = left + "px";
-      popover.style.top = Math.max(8, y + popover.offsetHeight + 12) + "px";
-      popover.classList.add("visible");
-    }
-
-    function hidePopover() {
-      $("rate-popover").classList.remove("visible");
     }
 
     function renderChart(records) {
@@ -183,19 +120,17 @@
           interaction: { mode: "index", intersect: false, axis: "x" },
           plugins: {
             legend: { position: "bottom", labels: { color: getComputedStyle(document.body).color, usePointStyle: true, boxWidth: 8, padding: 14, font: { size: 11 } } },
-            tooltip: { callbacks: { label: (context) => context.dataset.label + ": " + Number(context.parsed.y).toFixed(6) } }
+            tooltip: {
+              itemSort: (a, b) => (b.parsed.y ?? -Infinity) - (a.parsed.y ?? -Infinity),
+              callbacks: { label: (context) => context.dataset.label + ": " + Number(context.parsed.y).toFixed(6) }
+            }
           },
           scales: {
             x: { ticks: { color: "#82919a", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
             y: { ticks: { color: "#82919a", callback: (value) => Number(value).toFixed(4) }, grid: { color: "rgba(130,145,154,.16)" } }
-          },
-          onHover: (event, elements, chartInstance) => {
-            if (!elements.length) return;
-            showSnapshot(elements[0].index, chartInstance);
           }
         }
       });
-      $("chart-area").addEventListener("mouseleave", hidePopover);
     }
 
     async function loadHistory(days) {
