@@ -7,5 +7,8 @@ workers_dev = true
 binding = "PUSH_KV"
 id = "4353d85ebc96488792ec1bbd1a3aea53"
 
+[browser]
+binding = "BROWSER"
+
 [triggers]
 crons = ["*/5 * * * *"]
