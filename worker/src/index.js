@@ -178,6 +178,48 @@ const PROVIDERS = [
     },
   },
   {
+    name: "Western Union",
+    url: "https://www.westernunion.com/jp/en/currency-converter/jpy-to-php-rate.html",
+    async fetchRates(env) {
+      const cacheKey = "provider-rate:western-union";
+      const cacheTtlSeconds = 1800;
+      const cachedRaw = env?.PUSH_KV ? await env.PUSH_KV.get(cacheKey) : null;
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          const age = Date.now() - new Date(cached.updatedAt).getTime();
+          if (cached.rate > 0 && Number.isFinite(cached.rate) && age >= 0 && age < cacheTtlSeconds * 1000) {
+            return { rates: [{ method: "Published rate", rate: cached.rate }], updatedAt: cached.updatedAt };
+          }
+        } catch {
+          // Ignore an invalid cache entry and fetch a fresh rate.
+        }
+      }
+
+      if (!env?.BROWSER) throw new Error("Cloudflare Browser Run binding is not configured");
+      const response = await env.BROWSER.quickAction("scrape", {
+        url: "https://www.westernunion.com/jp/en/currency-converter/jpy-to-php-rate.html?sendAmount=1",
+        gotoOptions: { waitUntil: "networkidle2", timeout: 45000 },
+        waitForSelector: { selector: ".fx-to", timeout: 30000 },
+        elements: [{ selector: ".fx-to" }],
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Browser Run HTTP ${response.status}: ${body.slice(0, 300)}`);
+      }
+      const data = await response.json();
+      const displayedRate = data?.result?.find((item) => item.selector === ".fx-to")?.results?.text;
+      const match = String(displayedRate ?? "").match(/([0-9]+(?:\.[0-9]+)?)/);
+      const rate = match ? Number(match[1]) : NaN;
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("Western Union JPY/PHP rate not found");
+      const updatedAt = new Date().toISOString();
+      if (env.PUSH_KV) {
+        await env.PUSH_KV.put(cacheKey, JSON.stringify({ rate, updatedAt }), { expirationTtl: cacheTtlSeconds });
+      }
+      return { rates: [{ method: "Published rate", rate }], updatedAt };
+    },
+  },
+  {
     name: "City Express",
     url: "https://ctxpress.co.jp/en/exchange-rates/",
     async fetchRates() {
@@ -372,10 +414,10 @@ async function inspectSBI() {
   }
   return { initial: { status: initial.status, finalUrl: initial.url, setCookie, cookie, htmlLength: initialHtml.length, tokenFound: Boolean(token), viewStateFound: Boolean(viewState) }, postResult, exchangePage };
 }
-async function fetchProvider(provider) {
+async function fetchProvider(provider, env) {
   try {
     if (provider.fetchRates) {
-      const result = await provider.fetchRates();
+      const result = await provider.fetchRates(env);
       return {
         name: provider.name,
         url: provider.url,
@@ -409,11 +451,11 @@ async function fetchProvider(provider) {
 }
 
 
-async function fetchAllProviders({ excludeCityExpress = false } = {}) {
+async function fetchAllProviders({ excludeCityExpress = false } = {}, env) {
   const providers = excludeCityExpress
     ? PROVIDERS.filter((provider) => provider.name !== "City Express")
     : PROVIDERS;
-  return await Promise.all(providers.map(fetchProvider));
+  return await Promise.all(providers.map((provider) => fetchProvider(provider, env)));
 }
 
 function getRanking(providers) {
@@ -581,7 +623,7 @@ async function checkRankingAndNotify(env) {
 
   // City Express is our own service. Its API is not available to Cron requests,
   // so Cron deliberately checks only other providers and never alerts on it.
-  const providers = await fetchAllProviders({ excludeCityExpress: true });
+  const providers = await fetchAllProviders({ excludeCityExpress: true }, env);
   const failures = providers
     .filter((provider) => provider.error || !provider.rates?.length)
     .map((provider) => ({ name: provider.name, error: provider.error || "No rates returned" }));
@@ -684,7 +726,7 @@ export default {
       return jsonResponse({ error: "Method not allowed" }, 405, corsHeaders);
     }
 
-    const providers = await fetchAllProviders();
+    const providers = await fetchAllProviders({}, env);
     const successful = providers.filter((provider) => provider.rates?.length);
     return jsonResponse({
       updated: new Date().toISOString(),
