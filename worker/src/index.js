@@ -458,6 +458,33 @@ async function fetchAllProviders({ excludeCityExpress = false } = {}, env) {
   return await Promise.all(providers.map((provider) => fetchProvider(provider, env)));
 }
 
+async function collectAndSaveRateHistory(env) {
+  if (!env.RATE_HISTORY) {
+    console.error("Rate history D1 binding is not configured.");
+    return;
+  }
+
+  const providers = await fetchAllProviders({}, env);
+  const recordedAt = new Date().toISOString();
+  const statements = providers.flatMap((provider) =>
+    (provider.rates || [])
+      .filter((entry) => Number.isFinite(Number(entry.rate)) && Number(entry.rate) > 0)
+      .map((entry) => env.RATE_HISTORY.prepare(
+        "INSERT OR REPLACE INTO rate_history (recorded_at, provider, method, rate, source_updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(recordedAt, provider.name, entry.method || "Not specified", Number(entry.rate), provider.updatedAt || null))
+  );
+
+  if (!statements.length) {
+    console.error("Rate history snapshot skipped because no provider returned rates.");
+    return;
+  }
+
+  await env.RATE_HISTORY.batch(statements);
+  const retentionCutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  await env.RATE_HISTORY.prepare("DELETE FROM rate_history WHERE recorded_at < ?").bind(retentionCutoff).run();
+  console.info("Saved rate history snapshot:", recordedAt, "records:", statements.length);
+}
+
 function getRanking(providers) {
   return providers
     .flatMap((provider) => (provider.rates || []).map((rate) => ({
@@ -687,6 +714,10 @@ async function checkRankingAndNotify(env) {
 
 export default {
   async scheduled(controller, env, ctx) {
+    if (controller.cron === "0 12 * * *") {
+      ctx.waitUntil(collectAndSaveRateHistory(env));
+      return;
+    }
     ctx.waitUntil(checkRankingAndNotify(env));
   },
 
@@ -700,6 +731,22 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    if (url.pathname === "/api/history") {
+      if (request.method !== "GET") {
+        return jsonResponse({ error: "Method not allowed" }, 405, corsHeaders);
+      }
+      if (!env.RATE_HISTORY) {
+        return jsonResponse({ error: "Rate history is not configured" }, 503, corsHeaders);
+      }
+      const requestedDays = Number(url.searchParams.get("days") || 90);
+      const days = [30, 90, 180, 365].includes(requestedDays) ? requestedDays : 90;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const result = await env.RATE_HISTORY.prepare(
+        "SELECT recorded_at AS recordedAt, provider, method, rate, source_updated_at AS sourceUpdatedAt FROM rate_history WHERE recorded_at >= ? ORDER BY recorded_at ASC, provider ASC, method ASC"
+      ).bind(since).all();
+      return jsonResponse({ days, records: result.results || [] }, 200, corsHeaders);
     }
 
     if (url.pathname === "/api/push/public-key" && request.method === "GET") {
