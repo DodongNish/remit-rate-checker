@@ -105,6 +105,20 @@
     .tag { display: inline-block; color: var(--best); font-size: .75rem; font-weight: 650; margin-left: 8px; }
     tr.error td { color: var(--err); }
     .table-wrap { overflow-x: auto; border-radius: 8px; }
+    .loading-row td { text-align: center; padding: 32px 12px; }
+    .loading-spinner {
+      display: inline-block;
+      color: var(--best);
+      font-size: 2rem;
+      line-height: 1;
+      animation: loading-spin 1.2s linear infinite;
+    }
+    @keyframes loading-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .loading-spinner { animation: none; }
+    }
     @media (max-width: 520px) {
       th, td { padding: 10px 8px; font-size: .85rem; }
       td.rate, td.current-rate { font-size: .95rem; }
@@ -299,7 +313,7 @@
     <div class="table-wrap">
       <table aria-live="polite">
         <thead><tr><th scope="col">Provider</th><th scope="col" class="method-column">Transfer method</th><th scope="col" style="text-align:right">Exchange rate</th><th scope="col">Rate updated</th></tr></thead>
-        <tbody id="rates"></tbody>
+        <tbody id="rates"><tr class="loading-row"><td colspan="4"><span class="loading-spinner" role="status" aria-label="Loading exchange rates">₱</span></td></tr></tbody>
       </table>
     </div>
 
@@ -627,6 +641,14 @@
         $("updated").textContent = hasLoadedRates
           ? "Refresh failed. Showing the last successfully loaded rates."
           : "Unable to load exchange rates. Retrying in 1 minute.";
+        if (!hasLoadedRates) {
+          const tr = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 4;
+          cell.textContent = "Unable to load rates. Retrying in 1 minute.";
+          tr.appendChild(cell);
+          $("rates").replaceChildren(tr);
+        }
       } finally {
         isLoading = false;
       }
