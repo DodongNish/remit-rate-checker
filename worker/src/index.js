@@ -225,14 +225,6 @@ const PROVIDERS = [
     async fetchRates() {
       const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
       const response = await fetch(apiUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-          "Accept": "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Origin": "https://ctxpress.co.jp",
-          "Referer": "https://ctxpress.co.jp/en/exchange-rates/",
-        },
-        cache: "no-store",
         signal: AbortSignal.timeout(12000),
       });
       const responseBody = await response.text();
@@ -251,47 +243,6 @@ const PROVIDERS = [
         rates: [{ method: "Published rate", rate }],
         updatedAt: data?.asOf ?? null,
       };
-    },
-    async fetchTrackingRates(env) {
-      const cacheKey = "provider-rate:city-express";
-      const cacheTtlSeconds = 300;
-      const cachedRaw = env?.PUSH_KV ? await env.PUSH_KV.get(cacheKey) : null;
-      if (cachedRaw) {
-        try {
-          const cached = JSON.parse(cachedRaw);
-          const age = Date.now() - new Date(cached.updatedAt).getTime();
-          if (cached.rate > 0 && Number.isFinite(cached.rate) && age >= 0 && age < cacheTtlSeconds * 1000) {
-            return { rates: [{ method: "Published rate", rate: cached.rate }], updatedAt: cached.updatedAt };
-          }
-        } catch {
-          // Ignore invalid cache data and fetch a fresh rate.
-        }
-      }
-
-      if (!env?.BROWSER) throw new Error("Cloudflare Browser Run binding is not configured");
-      const response = await env.BROWSER.quickAction("scrape", {
-        url: "https://ctxpress.co.jp/en/exchange-rates/",
-        gotoOptions: { waitUntil: "networkidle2", timeout: 60000 },
-        waitForSelector: { selector: "table tr", timeout: 30000 },
-        elements: [{ selector: "body" }],
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Browser Run HTTP ${response.status}: ${body.slice(0, 300)}`);
-      }
-      const data = await response.json();
-      const pageText = data?.result?.find((item) => item.selector === "body")?.results?.[0]?.text ?? "";
-      const philippinesRow = pageText.match(/Philippines\s+PHP\s+([0-9]+(?:\.[0-9]+)?)/i);
-      const rate = philippinesRow ? Number(philippinesRow[1]) : NaN;
-      if (!Number.isFinite(rate) || rate <= 0) {
-        throw new Error("City Express Philippines PHP rate not found in rendered page");
-      }
-      const updatedAt = pageText.match(/Last updated\s+([^\n]+)/i)?.[1]?.trim() ?? new Date().toISOString();
-      const result = { rates: [{ method: "Published rate", rate }], updatedAt };
-      if (env.PUSH_KV) {
-        await env.PUSH_KV.put(cacheKey, JSON.stringify({ rate, updatedAt: new Date().toISOString() }), { expirationTtl: cacheTtlSeconds });
-      }
-      return result;
     },
   },
 ];
@@ -457,8 +408,8 @@ async function inspectSBI() {
 }
 async function fetchProvider(provider, env, { useBrowserForCityExpress = false } = {}) {
   try {
-    if (useBrowserForCityExpress && provider.name === "City Express" && provider.fetchTrackingRates) {
-      const result = await provider.fetchTrackingRates(env);
+    if (useBrowserForCityExpress && provider.name === "City Express" && provider.fetchRates) {
+      const result = await provider.fetchRates(env);
       return {
         name: provider.name,
         url: provider.url,
@@ -700,7 +651,7 @@ async function checkRankingAndNotify(env) {
     return;
   }
 
-  // Use a rendered browser scrape for City Express only in scheduled tracking.
+  // Use the direct public rates API for City Express in scheduled tracking.
   // The normal /api/rates endpoint continues to use its existing direct API fetch.
   const providers = await fetchAllProviders({ useBrowserForCityExpress: true }, env);
   const failures = providers
