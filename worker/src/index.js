@@ -225,6 +225,10 @@ const PROVIDERS = [
     async fetchRates() {
       const apiUrl = "https://admin.ctxpress.co.jp/api/public/rates";
       const response = await fetch(apiUrl, {
+        headers: {
+          "Origin": "https://www.cityremit.com",
+          "Referer": "https://www.cityremit.com/",
+        },
         signal: AbortSignal.timeout(12000),
       });
       const responseBody = await response.text();
